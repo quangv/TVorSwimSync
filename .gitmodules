@@ -1,0 +1,3 @@
+[submodule "hammerspoon-config"]
+	path = hammerspoon-config
+	url = git@github.com:quangv/hammerspoon-config.git
