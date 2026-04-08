@@ -179,11 +179,11 @@ fn extract_symbol(title: &str, source: &str) -> Option<String> {
         .trim_end_matches(|c: char| !c.is_alphanumeric() && c != '!' && c != '.' && c != '-')
         .to_string();
 
-    if cleaned.len() < 2 {
+    if cleaned.is_empty() {
         return None;
     }
 
-    Some(cleaned.chars().take(4).collect::<String>().to_uppercase())
+    Some(cleaned.to_uppercase())
 }
 
 #[tauri::command]
