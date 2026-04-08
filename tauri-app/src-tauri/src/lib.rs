@@ -44,6 +44,12 @@ fn state_file_path() -> std::path::PathBuf {
     path
 }
 
+fn click_target_file_path() -> std::path::PathBuf {
+    let mut path = dirs::home_dir().unwrap_or_default();
+    path.push(".tvorswim_click_target.json");
+    path
+}
+
 /// Get the front window title for an app using Core Graphics.
 /// Iterates on-screen windows (front-to-back order) and returns the first
 /// title belonging to `owner_name`.
@@ -256,16 +262,30 @@ fn get_sync_enabled() -> bool {
     SYNC_ENABLED.load(Ordering::Relaxed)
 }
 
-/// Click 20px below the app window (horizontally centered), type the symbol, press Enter.
-/// Coordinates are in physical pixels — we convert to screen points using the scale factor.
 #[tauri::command]
-fn sync_to_tos(symbol: String, window_x: f64, window_y: f64, window_width: f64, window_height: f64, scale_factor: f64) {
-    let scale = if scale_factor > 0.0 { scale_factor } else { 2.0 };
-    let click_x = (window_x + window_width / 2.0) / scale;
-    let click_y = (window_y + window_height) / scale + 20.0;
+fn save_click_target(x: f64, y: f64, app_handle: tauri::AppHandle) {
+    let pos = SavedPosition { x, y };
+    if let Ok(json) = serde_json::to_string(&pos) {
+        let _ = fs::write(click_target_file_path(), json);
+    }
+    // Close the calibration window immediately
+    if let Some(win) = app_handle.get_webview_window("calibrate") {
+        let _ = win.destroy();
+    }
+}
+
+#[tauri::command]
+fn load_click_target() -> Option<SavedPosition> {
+    let data = fs::read_to_string(click_target_file_path()).ok()?;
+    serde_json::from_str(&data).ok()
+}
+
+/// Click at the saved target position, type the symbol, press Enter.
+/// click_x/click_y are in screen points.
+#[tauri::command]
+fn sync_to_tos(symbol: String, click_x: f64, click_y: f64) {
     let point = CGPoint::new(click_x, click_y);
 
-    eprintln!("[sync] window pos=({}, {}), size=({}, {}), scale={}", window_x, window_y, window_width, window_height, scale_factor);
     eprintln!("[sync] clicking at screen point ({}, {})", click_x, click_y);
     eprintln!("[sync] typing symbol: {}", symbol);
 
@@ -317,6 +337,9 @@ pub fn run() {
             let sync_item = MenuItemBuilder::new("Enable Auto-Sync (Beta)")
                 .id("toggle_sync")
                 .build(app)?;
+            let setup_item = MenuItemBuilder::new("Setup Auto-Sync Target...")
+                .id("setup_sync")
+                .build(app)?;
             let disclaimer = MenuItemBuilder::new("⚠ Beta software – use at your own risk")
                 .id("disclaimer")
                 .enabled(false)
@@ -328,6 +351,7 @@ pub fn run() {
 
             let app_submenu = SubmenuBuilder::new(app, "TVorSwimSync")
                 .item(&sync_item)
+                .item(&setup_item)
                 .separator()
                 .item(&disclaimer)
                 .separator()
@@ -354,6 +378,22 @@ pub fn run() {
                         "Enable Auto-Sync (Beta)"
                     };
                     let _ = sync_item.set_text(label);
+                } else if event.id().as_ref() == "setup_sync" {
+                    if let Some(existing) = app_handle.get_webview_window("calibrate") {
+                        let _ = existing.set_focus();
+                    } else {
+                        let _ = WebviewWindowBuilder::new(
+                            app_handle,
+                            "calibrate",
+                            WebviewUrl::App("calibrate.html".into()),
+                        )
+                        .title("Setup Auto-Sync")
+                        .transparent(true)
+                        .decorations(false)
+                        .always_on_top(true)
+                        .maximized(true)
+                        .build();
+                    }
                 } else if event.id().as_ref() == "show_help" {
                     // Open a new help window
                     if let Some(existing) = app_handle.get_webview_window("help") {
@@ -384,6 +424,8 @@ pub fn run() {
             load_position,
             sync_to_tos,
             get_sync_enabled,
+            save_click_target,
+            load_click_target,
             check_screen_recording_permission,
             request_screen_recording_permission
         ])

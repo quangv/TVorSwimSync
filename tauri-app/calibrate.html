@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Setup Auto-Sync</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body {
+        width: 100vw;
+        height: 100vh;
+        overflow: hidden;
+        background: rgba(0, 0, 0, 0.01);
+        cursor: crosshair;
+      }
+      #tooltip {
+        position: fixed;
+        pointer-events: none;
+        background: rgba(0, 0, 0, 0.85);
+        color: white;
+        font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+        font-size: 13px;
+        padding: 8px 14px;
+        border-radius: 8px;
+        white-space: nowrap;
+        transform: translate(20px, 20px);
+        z-index: 9999;
+      }
+      #crosshair-h, #crosshair-v {
+        position: fixed;
+        pointer-events: none;
+        background: rgba(255, 59, 48, 0.6);
+        z-index: 9998;
+      }
+      #crosshair-h {
+        left: 0;
+        right: 0;
+        height: 1px;
+      }
+      #crosshair-v {
+        top: 0;
+        bottom: 0;
+        width: 1px;
+      }
+      #banner {
+        position: fixed;
+        top: 16px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(0, 0, 0, 0.85);
+        color: white;
+        font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+        font-size: 14px;
+        padding: 10px 20px;
+        border-radius: 10px;
+        pointer-events: none;
+        z-index: 9999;
+      }
+      #banner kbd {
+        background: rgba(255,255,255,0.2);
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="banner">🎯 Click on the thinkorswim symbol input field · <kbd>Esc</kbd> to cancel</div>
+    <div id="tooltip">Click to set target</div>
+    <div id="crosshair-h"></div>
+    <div id="crosshair-v"></div>
+    <script>
+      const { invoke } = window.__TAURI__.core;
+      const { getCurrentWindow } = window.__TAURI__.window;
+
+      const tooltip = document.getElementById('tooltip');
+      const crosshairH = document.getElementById('crosshair-h');
+      const crosshairV = document.getElementById('crosshair-v');
+
+      document.addEventListener('mousemove', (e) => {
+        tooltip.style.left = e.clientX + 'px';
+        tooltip.style.top = e.clientY + 'px';
+        crosshairH.style.top = e.clientY + 'px';
+        crosshairV.style.left = e.clientX + 'px';
+      });
+
+      document.addEventListener('click', async (e) => {
+        const screenX = e.screenX;
+        const screenY = e.screenY;
+        // Rust command will save and close this window
+        await invoke('save_click_target', { x: screenX, y: screenY });
+      });
+
+      document.addEventListener('keydown', async (e) => {
+        if (e.key === 'Escape') {
+          const win = getCurrentWindow();
+          await win.close();
+        }
+      });
+    </script>
+  </body>
+</html>

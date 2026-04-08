@@ -1,6 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow, PhysicalPosition } from "@tauri-apps/api/window";
-import { listen } from "@tauri-apps/api/event";
 
 interface SymbolState {
   tradingview_symbol: string | null;
@@ -93,7 +92,7 @@ async function pollSymbols() {
       symbolEl.textContent = "--";
     }
 
-    // Auto-sync: when TV symbol changes, type it into thinkorswim input below the widget
+    // Auto-sync: when TV symbol changes, type it into thinkorswim input
     const syncEnabled = await invoke<boolean>("get_sync_enabled");
     if (
       syncEnabled &&
@@ -104,23 +103,18 @@ async function pollSymbols() {
     ) {
       syncing = true;
       try {
-        const win = getCurrentWindow();
-        const pos = await win.outerPosition();
-        const size = await win.outerSize();
-        const scaleFactor = await win.scaleFactor();
-        // Hide window so it doesn't intercept the click
-        await win.hide();
-        await invoke("sync_to_tos", {
-          symbol: state.tradingview_symbol,
-          windowX: pos.x,
-          windowY: pos.y,
-          windowWidth: size.width,
-          windowHeight: size.height,
-          scaleFactor,
-        });
-        await win.show();
+        const target = await invoke<SavedPosition | null>("load_click_target");
+        if (target) {
+          const win = getCurrentWindow();
+          await win.hide();
+          await invoke("sync_to_tos", {
+            symbol: state.tradingview_symbol,
+            clickX: target.x,
+            clickY: target.y,
+          });
+          await win.show();
+        }
       } catch {
-        // Make sure window is visible even on error
         try {
           await getCurrentWindow().show();
         } catch {}
