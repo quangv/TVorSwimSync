@@ -19,35 +19,68 @@ const SAVE_DEBOUNCE_MS = 500;
 
 const emojiEl = document.getElementById("emoji")!;
 const symbolEl = document.getElementById("symbol")!;
-const permBanner = document.getElementById("perm-banner")!;
+const permScreen = document.getElementById("perm-screen")!;
+const permA11y = document.getElementById("perm-a11y")!;
 
 let hasScreenPermission = true;
+let hasA11yPermission = true;
 let lastTvSymbol: string | null = null;
 let syncing = false;
 
-async function checkPermission() {
+async function checkPermissions() {
   try {
     hasScreenPermission = await invoke<boolean>(
       "check_screen_recording_permission",
     );
-    if (!hasScreenPermission) {
-      permBanner.style.display = "flex";
-    } else {
-      permBanner.style.display = "none";
-    }
   } catch {
-    // ignore
+    hasScreenPermission = true; // assume ok if check fails
+  }
+
+  try {
+    hasA11yPermission = await invoke<boolean>(
+      "check_accessibility_permission_cmd",
+      { prompt: false },
+    );
+  } catch {
+    hasA11yPermission = true; // assume ok if check fails
+  }
+
+  // Show screen recording banner first (takes priority)
+  if (!hasScreenPermission) {
+    permScreen.style.display = "flex";
+    permA11y.style.display = "none";
+  } else if (!hasA11yPermission) {
+    permScreen.style.display = "none";
+    permA11y.style.display = "flex";
+  } else {
+    permScreen.style.display = "none";
+    permA11y.style.display = "none";
   }
 }
 
-permBanner.addEventListener("click", async () => {
+permScreen.addEventListener("click", async () => {
   try {
     await invoke<boolean>("request_screen_recording_permission");
-    // Re-check after a short delay (user may need to toggle in Settings)
-    setTimeout(checkPermission, 2000);
   } catch {
     // ignore
   }
+  // Re-check frequently — user may grant in Settings and come back
+  const recheckId = setInterval(checkPermissions, 1500);
+  setTimeout(() => clearInterval(recheckId), 30000);
+});
+
+permA11y.addEventListener("click", async () => {
+  try {
+    // This opens the system Accessibility prompt dialog
+    await invoke<boolean>("check_accessibility_permission_cmd", {
+      prompt: true,
+    });
+  } catch {
+    // ignore
+  }
+  // Re-check frequently — user may grant in Settings and come back
+  const recheckId = setInterval(checkPermissions, 1500);
+  setTimeout(() => clearInterval(recheckId), 30000);
 });
 
 async function restorePosition() {
@@ -128,8 +161,8 @@ async function pollSymbols() {
 
 // Initialize
 restorePosition();
-checkPermission();
+checkPermissions();
 pollSymbols();
 setInterval(pollSymbols, POLL_INTERVAL_MS);
-// Re-check permission periodically in case user grants it
-setInterval(checkPermission, 5000);
+// Re-check permissions periodically in case user grants them
+setInterval(checkPermissions, 5000);

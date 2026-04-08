@@ -545,13 +545,6 @@ pub fn run() {
                 }
             });
 
-            // Prompt for Accessibility permission if not already granted
-            // (required for sending synthetic clicks/keystrokes to other apps)
-            if !check_accessibility_permission(false) {
-                eprintln!("[permissions] Accessibility permission not granted — prompting user");
-                check_accessibility_permission(true);
-            }
-
             Ok(())
         })
         .manage(AppState {
