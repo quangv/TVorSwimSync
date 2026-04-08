@@ -340,6 +340,9 @@ pub fn run() {
             let test_item = MenuItemBuilder::new("Test Target")
                 .id("test_target")
                 .build(app)?;
+            let test_sync_item = MenuItemBuilder::new("Test Sync → NVDA")
+                .id("test_sync_nvda")
+                .build(app)?;
             let disclaimer = MenuItemBuilder::new("⚠ Beta software – use at your own risk")
                 .id("disclaimer")
                 .enabled(false)
@@ -353,6 +356,7 @@ pub fn run() {
                 .item(&sync_item)
                 .item(&setup_item)
                 .item(&test_item)
+                .item(&test_sync_item)
                 .separator()
                 .item(&disclaimer)
                 .separator()
@@ -427,6 +431,22 @@ pub fn run() {
 
                         // Also perform a real CGEvent click at the saved position
                         test_click_target();
+                    }
+                } else if event.id().as_ref() == "test_sync_nvda" {
+                    if let Some(pos) = load_click_target() {
+                        // Hide main window, sync NVDA, show main window
+                        if let Some(main_win) = app_handle.get_webview_window("main") {
+                            let _ = main_win.hide();
+                        }
+                        sync_to_tos("NVDA".to_string(), pos.x, pos.y);
+                        // Show after a delay (sync runs in a thread)
+                        let app_clone = app_handle.clone();
+                        std::thread::spawn(move || {
+                            std::thread::sleep(std::time::Duration::from_secs(2));
+                            if let Some(main_win) = app_clone.get_webview_window("main") {
+                                let _ = main_win.show();
+                            }
+                        });
                     }
                 } else if event.id().as_ref() == "show_help" {
                     // Open a new help window
