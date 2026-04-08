@@ -104,6 +104,25 @@ extern "C" {
     fn CGRequestScreenCaptureAccess() -> bool;
 }
 
+// Accessibility check via Core Foundation
+fn check_accessibility_permission(prompt: bool) -> bool {
+    use core_foundation::base::TCFType;
+    use core_foundation::boolean::CFBoolean;
+    use core_foundation::dictionary::CFDictionary;
+    use core_foundation::string::CFString;
+
+    extern "C" {
+        fn AXIsProcessTrustedWithOptions(
+            options: core_foundation::dictionary::CFDictionaryRef,
+        ) -> bool;
+    }
+
+    let key = CFString::new("AXTrustedCheckOptionPrompt");
+    let value = if prompt { CFBoolean::true_value() } else { CFBoolean::false_value() };
+    let options = CFDictionary::from_CFType_pairs(&[(key.as_CFType(), value.as_CFType())]);
+    unsafe { AXIsProcessTrustedWithOptions(options.as_concrete_TypeRef()) }
+}
+
 #[tauri::command]
 fn check_screen_recording_permission() -> bool {
     unsafe { CGPreflightScreenCaptureAccess() }
@@ -112,6 +131,11 @@ fn check_screen_recording_permission() -> bool {
 #[tauri::command]
 fn request_screen_recording_permission() -> bool {
     unsafe { CGRequestScreenCaptureAccess() }
+}
+
+#[tauri::command]
+fn check_accessibility_permission_cmd(prompt: bool) -> bool {
+    check_accessibility_permission(prompt)
 }
 
 fn get_tradingview_title() -> Option<String> {
@@ -255,19 +279,6 @@ fn sync_to_tos(symbol: String, click_x: f64, click_y: f64) {
         mouse_up.post(CGEventTapLocation::HID);
 
         std::thread::sleep(std::time::Duration::from_millis(200));
-
-        // Select all existing text (Cmd+A) so new typing replaces it
-        let select_all_down = CGEvent::new_keyboard_event(source.clone(), 0, true).unwrap();
-        let select_all_up = CGEvent::new_keyboard_event(source.clone(), 0, false).unwrap();
-        select_all_down.set_flags(core_graphics::event::CGEventFlags::CGEventFlagCommand);
-        select_all_up.set_flags(core_graphics::event::CGEventFlags::CGEventFlagCommand);
-        let a_utf16: Vec<u16> = 'a'.encode_utf16(&mut [0; 2]).to_vec();
-        select_all_down.set_string_from_utf16_unchecked(&a_utf16);
-        select_all_down.post(CGEventTapLocation::HID);
-        std::thread::sleep(std::time::Duration::from_millis(10));
-        select_all_up.post(CGEventTapLocation::HID);
-
-        std::thread::sleep(std::time::Duration::from_millis(100));
 
         // Type each character of the symbol via CGEvent
         for ch in symbol.chars() {
@@ -466,6 +477,13 @@ pub fn run() {
                 }
             });
 
+            // Prompt for Accessibility permission if not already granted
+            // (required for sending synthetic clicks/keystrokes to other apps)
+            if !check_accessibility_permission(false) {
+                eprintln!("[permissions] Accessibility permission not granted — prompting user");
+                check_accessibility_permission(true);
+            }
+
             Ok(())
         })
         .manage(AppState {
@@ -483,7 +501,8 @@ pub fn run() {
             check_screen_recording_permission,
             request_screen_recording_permission,
             close_window,
-            test_click_target
+            test_click_target,
+            check_accessibility_permission_cmd
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
