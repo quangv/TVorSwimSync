@@ -100,6 +100,13 @@ async function pollSymbols() {
     }
 
     emojiEl.textContent = state.matched ? "🌊" : "🛑";
+
+    // Wave crashing over symbol when synced; centered on stop sign when unsynced
+    if (state.matched) {
+      symbolEl.style.transform = "translateY(22px)";
+    } else {
+      symbolEl.style.transform = "";
+    }
   } catch {
     // TradingView/thinkorswim may not be running
   }
