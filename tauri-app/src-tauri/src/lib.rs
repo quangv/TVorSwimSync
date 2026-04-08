@@ -11,7 +11,9 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::sync::Mutex;
 use tauri::State;
+use tauri::Manager;
 use tauri::menu::{MenuBuilder, MenuItemBuilder, PredefinedMenuItem, SubmenuBuilder};
+use tauri::{Emitter, WebviewWindowBuilder, WebviewUrl};
 use std::sync::atomic::{AtomicBool, Ordering};
 
 static SYNC_ENABLED: AtomicBool = AtomicBool::new(false);
@@ -204,13 +206,8 @@ fn extract_symbol(title: &str, source: &str) -> Option<String> {
 
 #[tauri::command]
 fn poll_symbols(state: State<AppState>) -> SymbolState {
-    debug_log_all_windows();
-
     let tv_title = get_tradingview_title();
     let tos_title = get_thinkorswim_title();
-
-    eprintln!("[debug] TV raw title: {:?}", tv_title);
-    eprintln!("[debug] ToS raw title: {:?}", tos_title);
 
     if let Some(ref t) = tv_title {
         *state.last_tv_title.lock().unwrap() = Some(t.clone());
@@ -225,8 +222,6 @@ fn poll_symbols(state: State<AppState>) -> SymbolState {
     let tos_sym = tos_title
         .as_deref()
         .and_then(|t| extract_symbol(t, "thinkorswim"));
-
-    eprintln!("[debug] Extracted TV symbol: {:?}, ToS symbol: {:?}", tv_sym, tos_sym);
 
     let matched = match (&tv_sym, &tos_sym) {
         (Some(a), Some(b)) => a == b,
@@ -270,6 +265,10 @@ fn sync_to_tos(symbol: String, window_x: f64, window_y: f64, window_width: f64, 
     let click_y = (window_y + window_height) / scale + 20.0;
     let point = CGPoint::new(click_x, click_y);
 
+    eprintln!("[sync] window pos=({}, {}), size=({}, {}), scale={}", window_x, window_y, window_width, window_height, scale_factor);
+    eprintln!("[sync] clicking at screen point ({}, {})", click_x, click_y);
+    eprintln!("[sync] typing symbol: {}", symbol);
+
     let source = CGEventSource::new(CGEventSourceStateID::HIDSystemState).unwrap();
 
     // Click to focus the input field
@@ -288,7 +287,7 @@ fn sync_to_tos(symbol: String, window_x: f64, window_y: f64, window_width: f64, 
     mouse_down.post(CGEventTapLocation::HID);
     mouse_up.post(CGEventTapLocation::HID);
 
-    std::thread::sleep(std::time::Duration::from_millis(100));
+    std::thread::sleep(std::time::Duration::from_secs(1));
 
     // Type each character of the symbol via CGEvent
     for ch in symbol.chars() {
@@ -298,10 +297,10 @@ fn sync_to_tos(symbol: String, window_x: f64, window_y: f64, window_width: f64, 
         event_down.set_string_from_utf16_unchecked(&utf16);
         event_down.post(CGEventTapLocation::HID);
         event_up.post(CGEventTapLocation::HID);
-        std::thread::sleep(std::time::Duration::from_millis(20));
+        std::thread::sleep(std::time::Duration::from_secs(1));
     }
 
-    std::thread::sleep(std::time::Duration::from_millis(1000));
+    std::thread::sleep(std::time::Duration::from_secs(1));
 
     // Press Enter (keycode 36)
     let enter_down = CGEvent::new_keyboard_event(source.clone(), 36, true).unwrap();
@@ -323,6 +322,10 @@ pub fn run() {
                 .enabled(false)
                 .build(app)?;
 
+            let help_item = MenuItemBuilder::new("Sync Positioning Help")
+                .id("show_help")
+                .build(app)?;
+
             let app_submenu = SubmenuBuilder::new(app, "TVorSwimSync")
                 .item(&sync_item)
                 .separator()
@@ -331,12 +334,17 @@ pub fn run() {
                 .quit()
                 .build()?;
 
+            let help_submenu = SubmenuBuilder::new(app, "Help")
+                .item(&help_item)
+                .build()?;
+
             let menu = MenuBuilder::new(app)
                 .item(&app_submenu)
+                .item(&help_submenu)
                 .build()?;
             app.set_menu(menu)?;
 
-            app.on_menu_event(move |_app, event| {
+            app.on_menu_event(move |app_handle, event| {
                 if event.id().as_ref() == "toggle_sync" {
                     let was = SYNC_ENABLED.load(Ordering::Relaxed);
                     SYNC_ENABLED.store(!was, Ordering::Relaxed);
@@ -346,6 +354,21 @@ pub fn run() {
                         "Enable Auto-Sync (Beta)"
                     };
                     let _ = sync_item.set_text(label);
+                } else if event.id().as_ref() == "show_help" {
+                    // Open a new help window
+                    if let Some(existing) = app_handle.get_webview_window("help") {
+                        let _ = existing.set_focus();
+                    } else {
+                        let _ = WebviewWindowBuilder::new(
+                            app_handle,
+                            "help",
+                            WebviewUrl::App("help.html".into()),
+                        )
+                        .title("Sync Positioning Help")
+                        .inner_size(420.0, 480.0)
+                        .resizable(false)
+                        .build();
+                    }
                 }
             });
 

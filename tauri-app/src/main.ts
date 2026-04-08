@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow, PhysicalPosition } from "@tauri-apps/api/window";
+import { listen } from "@tauri-apps/api/event";
 
 interface SymbolState {
   tradingview_symbol: string | null;
@@ -86,15 +87,6 @@ async function pollSymbols() {
   try {
     const state = await invoke<SymbolState>("poll_symbols");
 
-    console.log("[debug] raw_tv_title:", state.raw_tv_title);
-    console.log("[debug] raw_tos_title:", state.raw_tos_title);
-    console.log(
-      "[debug] extracted TV:",
-      state.tradingview_symbol,
-      "ToS:",
-      state.thinkorswim_symbol,
-    );
-
     if (state.tradingview_symbol) {
       symbolEl.textContent = state.tradingview_symbol;
     } else {
@@ -116,6 +108,8 @@ async function pollSymbols() {
         const pos = await win.outerPosition();
         const size = await win.outerSize();
         const scaleFactor = await win.scaleFactor();
+        // Hide window so it doesn't intercept the click
+        await win.hide();
         await invoke("sync_to_tos", {
           symbol: state.tradingview_symbol,
           windowX: pos.x,
@@ -124,8 +118,12 @@ async function pollSymbols() {
           windowHeight: size.height,
           scaleFactor,
         });
+        await win.show();
       } catch {
-        // ignore sync errors
+        // Make sure window is visible even on error
+        try {
+          await getCurrentWindow().show();
+        } catch {}
       }
       syncing = false;
     }
