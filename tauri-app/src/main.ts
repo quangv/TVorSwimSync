@@ -107,12 +107,18 @@ async function pollSymbols() {
         if (target) {
           const win = getCurrentWindow();
           await win.hide();
+          // Wait for window to fully hide before clicking
+          await new Promise((r) => setTimeout(r, 200));
           await invoke("sync_to_tos", {
             symbol: state.tradingview_symbol,
             clickX: target.x,
             clickY: target.y,
           });
+          // Wait for TOS to process before showing window again
+          await new Promise((r) => setTimeout(r, 500));
           await win.show();
+          // Deactivate our app so we don't steal focus from TOS
+          await invoke("deactivate_app_cmd");
         }
       } catch {
         try {

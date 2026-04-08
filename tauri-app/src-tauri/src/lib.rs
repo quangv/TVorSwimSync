@@ -18,6 +18,19 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 static SYNC_ENABLED: AtomicBool = AtomicBool::new(cfg!(debug_assertions));
 
+/// Deactivate our app so we don't steal focus from other apps.
+fn deactivate_app() {
+    use std::process::Command;
+    // Use osascript to tell System Events to activate the frontmost app that isn't us
+    // Simpler: just use NSApp's hide via objc if possible, but easiest is:
+    // We post a Cmd+Tab-like refocus by just not taking focus.
+    // Actually, use the cocoa API directly:
+    let _ = Command::new("osascript")
+        .arg("-e")
+        .arg(r#"tell application "System Events" to set frontmost of the first process whose frontmost is false to true"#)
+        .output();
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SymbolState {
     pub tradingview_symbol: Option<String>,
@@ -102,6 +115,8 @@ fn get_window_title_for_app(owner_name: &str) -> Option<String> {
 extern "C" {
     fn CGPreflightScreenCaptureAccess() -> bool;
     fn CGRequestScreenCaptureAccess() -> bool;
+    fn CGDisplayMoveCursorToPoint(display: u32, point: CGPoint) -> i32;
+    fn CGMainDisplayID() -> u32;
 }
 
 // Accessibility check via Core Foundation
@@ -224,6 +239,11 @@ fn get_sync_enabled() -> bool {
 }
 
 #[tauri::command]
+fn deactivate_app_cmd() {
+    deactivate_app();
+}
+
+#[tauri::command]
 fn close_window(label: String, app_handle: tauri::AppHandle) {
     if let Some(win) = app_handle.get_webview_window(&label) {
         let _ = win.destroy();
@@ -250,59 +270,105 @@ fn load_click_target() -> Option<SavedPosition> {
 
 /// Click at the saved target position, type the symbol, press Enter.
 /// click_x/click_y are in screen points (logical, not physical).
+/// Blocks until typing is complete so the caller can re-show the window after.
 #[tauri::command]
 fn sync_to_tos(symbol: String, click_x: f64, click_y: f64) {
-    // Run in a separate thread so we don't block the main/webview thread
-    std::thread::spawn(move || {
-        let point = CGPoint::new(click_x, click_y);
+    eprintln!("[sync] target ({}, {}), symbol: {}", click_x, click_y, symbol);
 
-        eprintln!("[sync] clicking at screen point ({}, {})", click_x, click_y);
-        eprintln!("[sync] typing symbol: {}", symbol);
-
-        let source = CGEventSource::new(CGEventSourceStateID::HIDSystemState).unwrap();
-
-        // Click to focus the input field
-        let mouse_down = CGEvent::new_mouse_event(
-            source.clone(),
-            CGEventType::LeftMouseDown,
-            point,
-            CGMouseButton::Left,
-        ).unwrap();
-        let mouse_up = CGEvent::new_mouse_event(
-            source.clone(),
-            CGEventType::LeftMouseUp,
-            point,
-            CGMouseButton::Left,
-        ).unwrap();
-        mouse_down.post(CGEventTapLocation::HID);
-        std::thread::sleep(std::time::Duration::from_millis(20));
-        mouse_up.post(CGEventTapLocation::HID);
-
-        std::thread::sleep(std::time::Duration::from_millis(200));
-
-        // Type each character of the symbol via CGEvent
-        for ch in symbol.chars() {
-            let event_down = CGEvent::new_keyboard_event(source.clone(), 0, true).unwrap();
-            let event_up = CGEvent::new_keyboard_event(source.clone(), 0, false).unwrap();
-            let utf16: Vec<u16> = ch.encode_utf16(&mut [0; 2]).to_vec();
-            event_down.set_string_from_utf16_unchecked(&utf16);
-            event_down.post(CGEventTapLocation::HID);
-            std::thread::sleep(std::time::Duration::from_millis(10));
-            event_up.post(CGEventTapLocation::HID);
-            std::thread::sleep(std::time::Duration::from_millis(50));
+    // 1. Activate thinkorswim via osascript
+    let script = r#"tell application "System Events"
+    set frontmost of process "thinkorswim" to true
+end tell
+delay 0.3"#;
+    eprintln!("[sync] activating thinkorswim...");
+    let output = std::process::Command::new("osascript")
+        .arg("-e")
+        .arg(script)
+        .output();
+    match &output {
+        Ok(o) if !o.status.success() => {
+            eprintln!("[sync] activate error: {}", String::from_utf8_lossy(&o.stderr));
         }
+        Err(e) => {
+            eprintln!("[sync] activate failed: {}", e);
+        }
+        _ => {}
+    }
 
-        std::thread::sleep(std::time::Duration::from_millis(100));
+    // 2. Click at the target position
+    eprintln!("[sync] clicking...");
+    let point = CGPoint::new(click_x, click_y);
+    unsafe {
+        CGDisplayMoveCursorToPoint(CGMainDisplayID(), point);
+    }
+    std::thread::sleep(std::time::Duration::from_millis(50));
 
-        // Press Enter (keycode 36)
-        let enter_down = CGEvent::new_keyboard_event(source.clone(), 36, true).unwrap();
-        enter_down.post(CGEventTapLocation::HID);
+    let source = CGEventSource::new(CGEventSourceStateID::Private).unwrap();
+
+    // First click (clickState = 1)
+    let mouse_down = CGEvent::new_mouse_event(
+        source.clone(),
+        CGEventType::LeftMouseDown,
+        point,
+        CGMouseButton::Left,
+    ).unwrap();
+    mouse_down.set_integer_value_field(core_graphics::event::EventField::MOUSE_EVENT_CLICK_STATE, 1);
+    let mouse_up = CGEvent::new_mouse_event(
+        source.clone(),
+        CGEventType::LeftMouseUp,
+        point,
+        CGMouseButton::Left,
+    ).unwrap();
+    mouse_up.set_integer_value_field(core_graphics::event::EventField::MOUSE_EVENT_CLICK_STATE, 1);
+    mouse_down.post(CGEventTapLocation::HID);
+    std::thread::sleep(std::time::Duration::from_millis(10));
+    mouse_up.post(CGEventTapLocation::HID);
+    std::thread::sleep(std::time::Duration::from_millis(50));
+
+    // Second click (clickState = 2) — makes it a double-click
+    let mouse_down2 = CGEvent::new_mouse_event(
+        source.clone(),
+        CGEventType::LeftMouseDown,
+        point,
+        CGMouseButton::Left,
+    ).unwrap();
+    mouse_down2.set_integer_value_field(core_graphics::event::EventField::MOUSE_EVENT_CLICK_STATE, 2);
+    let mouse_up2 = CGEvent::new_mouse_event(
+        source.clone(),
+        CGEventType::LeftMouseUp,
+        point,
+        CGMouseButton::Left,
+    ).unwrap();
+    mouse_up2.set_integer_value_field(core_graphics::event::EventField::MOUSE_EVENT_CLICK_STATE, 2);
+    mouse_down2.post(CGEventTapLocation::HID);
+    std::thread::sleep(std::time::Duration::from_millis(10));
+    mouse_up2.post(CGEventTapLocation::HID);
+
+    std::thread::sleep(std::time::Duration::from_millis(500));
+
+    // 3. Type each character via CGEvent
+    for ch in symbol.chars() {
+        let src = CGEventSource::new(CGEventSourceStateID::Private).unwrap();
+        let event_down = CGEvent::new_keyboard_event(src.clone(), 0, true).unwrap();
+        let event_up = CGEvent::new_keyboard_event(src, 0, false).unwrap();
+        event_down.set_string(&ch.to_string());
+        event_down.post(CGEventTapLocation::HID);
         std::thread::sleep(std::time::Duration::from_millis(10));
-        let enter_up = CGEvent::new_keyboard_event(source.clone(), 36, false).unwrap();
-        enter_up.post(CGEventTapLocation::HID);
+        event_up.post(CGEventTapLocation::HID);
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
 
-        eprintln!("[sync] done");
-    });
+    std::thread::sleep(std::time::Duration::from_millis(100));
+
+    // 4. Press Enter
+    let src = CGEventSource::new(CGEventSourceStateID::Private).unwrap();
+    let enter_down = CGEvent::new_keyboard_event(src.clone(), 36, true).unwrap();
+    enter_down.post(CGEventTapLocation::HID);
+    std::thread::sleep(std::time::Duration::from_millis(10));
+    let enter_up = CGEvent::new_keyboard_event(src.clone(), 36, false).unwrap();
+    enter_up.post(CGEventTapLocation::HID);
+
+    eprintln!("[sync] done");
 }
 
 /// Perform a test click at the saved target position to verify coordinates.
@@ -445,18 +511,22 @@ pub fn run() {
                     }
                 } else if event.id().as_ref() == "test_sync_nvda" {
                     if let Some(pos) = load_click_target() {
-                        // Hide main window, sync NVDA, show main window
-                        if let Some(main_win) = app_handle.get_webview_window("main") {
-                            let _ = main_win.hide();
-                        }
-                        sync_to_tos("NVDA".to_string(), pos.x, pos.y);
-                        // Show after a delay (sync runs in a thread)
                         let app_clone = app_handle.clone();
                         std::thread::spawn(move || {
-                            std::thread::sleep(std::time::Duration::from_secs(2));
+                            // Hide main window so it doesn't intercept clicks
+                            if let Some(main_win) = app_clone.get_webview_window("main") {
+                                let _ = main_win.hide();
+                            }
+                            // Wait for window to fully hide
+                            std::thread::sleep(std::time::Duration::from_millis(200));
+                            sync_to_tos("NVDA".to_string(), pos.x, pos.y);
+                            // Wait for TOS to process the Enter
+                            std::thread::sleep(std::time::Duration::from_millis(500));
                             if let Some(main_win) = app_clone.get_webview_window("main") {
                                 let _ = main_win.show();
                             }
+                            // Deactivate our app so we don't steal focus
+                            deactivate_app();
                         });
                     }
                 } else if event.id().as_ref() == "show_help" {
@@ -502,7 +572,8 @@ pub fn run() {
             request_screen_recording_permission,
             close_window,
             test_click_target,
-            check_accessibility_permission_cmd
+            check_accessibility_permission_cmd,
+            deactivate_app_cmd
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
