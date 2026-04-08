@@ -275,6 +275,10 @@ fn load_click_target() -> Option<SavedPosition> {
 fn sync_to_tos(symbol: String, click_x: f64, click_y: f64) {
     eprintln!("[sync] target ({}, {}), symbol: {}", click_x, click_y, symbol);
 
+    // Save current mouse position to restore later
+    let original_pos = CGEvent::new(CGEventSource::new(CGEventSourceStateID::Private).unwrap())
+        .map(|e| e.location());
+
     // 1. Activate thinkorswim via osascript
     let script = r#"tell application "System Events"
     set frontmost of process "thinkorswim" to true
@@ -365,6 +369,13 @@ end tell"#;
     std::thread::sleep(std::time::Duration::from_millis(10));
     let enter_up = CGEvent::new_keyboard_event(src.clone(), 36, false).unwrap();
     enter_up.post(CGEventTapLocation::HID);
+
+    // 5. Restore mouse to original position
+    if let Ok(pos) = original_pos {
+        unsafe {
+            CGDisplayMoveCursorToPoint(CGMainDisplayID(), pos);
+        }
+    }
 
     eprintln!("[sync] done");
 }
