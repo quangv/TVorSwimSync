@@ -11,7 +11,10 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::sync::Mutex;
 use tauri::State;
-use tauri::menu::Menu;
+use tauri::menu::{MenuBuilder, MenuItemBuilder, PredefinedMenuItem, SubmenuBuilder};
+use std::sync::atomic::{AtomicBool, Ordering};
+
+static SYNC_ENABLED: AtomicBool = AtomicBool::new(false);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SymbolState {
@@ -253,7 +256,12 @@ fn load_position() -> Option<SavedPosition> {
     serde_json::from_str(&data).ok()
 }
 
-/// Click 20px below the app window (horizontally centered), select all, type the symbol, press Enter.
+#[tauri::command]
+fn get_sync_enabled() -> bool {
+    SYNC_ENABLED.load(Ordering::Relaxed)
+}
+
+/// Click 20px below the app window (horizontally centered), type the symbol, press Enter.
 /// Coordinates are in physical pixels — we convert to screen points using the scale factor.
 #[tauri::command]
 fn sync_to_tos(symbol: String, window_x: f64, window_y: f64, window_width: f64, window_height: f64, scale_factor: f64) {
@@ -293,7 +301,7 @@ fn sync_to_tos(symbol: String, window_x: f64, window_y: f64, window_width: f64, 
         std::thread::sleep(std::time::Duration::from_millis(20));
     }
 
-    std::thread::sleep(std::time::Duration::from_millis(50));
+    std::thread::sleep(std::time::Duration::from_millis(1000));
 
     // Press Enter (keycode 36)
     let enter_down = CGEvent::new_keyboard_event(source.clone(), 36, true).unwrap();
@@ -307,8 +315,40 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
-            let menu = Menu::new(app)?;
+            let sync_item = MenuItemBuilder::new("Enable Auto-Sync (Beta)")
+                .id("toggle_sync")
+                .build(app)?;
+            let disclaimer = MenuItemBuilder::new("⚠ Beta software – use at your own risk")
+                .id("disclaimer")
+                .enabled(false)
+                .build(app)?;
+
+            let app_submenu = SubmenuBuilder::new(app, "TVorSwimSync")
+                .item(&sync_item)
+                .separator()
+                .item(&disclaimer)
+                .separator()
+                .quit()
+                .build()?;
+
+            let menu = MenuBuilder::new(app)
+                .item(&app_submenu)
+                .build()?;
             app.set_menu(menu)?;
+
+            app.on_menu_event(move |_app, event| {
+                if event.id().as_ref() == "toggle_sync" {
+                    let was = SYNC_ENABLED.load(Ordering::Relaxed);
+                    SYNC_ENABLED.store(!was, Ordering::Relaxed);
+                    let label = if !was {
+                        "✓ Auto-Sync Enabled (Beta)"
+                    } else {
+                        "Enable Auto-Sync (Beta)"
+                    };
+                    let _ = sync_item.set_text(label);
+                }
+            });
+
             Ok(())
         })
         .manage(AppState {
@@ -320,6 +360,7 @@ pub fn run() {
             save_position,
             load_position,
             sync_to_tos,
+            get_sync_enabled,
             check_screen_recording_permission,
             request_screen_recording_permission
         ])

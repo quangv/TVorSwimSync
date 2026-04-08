@@ -102,7 +102,9 @@ async function pollSymbols() {
     }
 
     // Auto-sync: when TV symbol changes, type it into thinkorswim input below the widget
+    const syncEnabled = await invoke<boolean>("get_sync_enabled");
     if (
+      syncEnabled &&
       state.tradingview_symbol &&
       state.tradingview_symbol !== lastTvSymbol &&
       lastTvSymbol !== null &&
