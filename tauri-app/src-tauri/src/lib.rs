@@ -16,7 +16,7 @@ use tauri::menu::{MenuBuilder, MenuItemBuilder, PredefinedMenuItem, SubmenuBuild
 use tauri::{Emitter, WebviewWindowBuilder, WebviewUrl};
 use std::sync::atomic::{AtomicBool, Ordering};
 
-static SYNC_ENABLED: AtomicBool = AtomicBool::new(false);
+static SYNC_ENABLED: AtomicBool = AtomicBool::new(cfg!(debug_assertions));
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SymbolState {
@@ -263,6 +263,13 @@ fn get_sync_enabled() -> bool {
 }
 
 #[tauri::command]
+fn close_window(label: String, app_handle: tauri::AppHandle) {
+    if let Some(win) = app_handle.get_webview_window(&label) {
+        let _ = win.destroy();
+    }
+}
+
+#[tauri::command]
 fn save_click_target(x: f64, y: f64, app_handle: tauri::AppHandle) {
     let pos = SavedPosition { x, y };
     if let Ok(json) = serde_json::to_string(&pos) {
@@ -334,7 +341,12 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
-            let sync_item = MenuItemBuilder::new("Enable Auto-Sync (Beta)")
+            let sync_label = if cfg!(debug_assertions) {
+                "✓ Auto-Sync Enabled (Beta)"
+            } else {
+                "Enable Auto-Sync (Beta)"
+            };
+            let sync_item = MenuItemBuilder::new(sync_label)
                 .id("toggle_sync")
                 .build(app)?;
             let setup_item = MenuItemBuilder::new("Setup Auto-Sync Target...")
@@ -453,7 +465,8 @@ pub fn run() {
             save_click_target,
             load_click_target,
             check_screen_recording_permission,
-            request_screen_recording_permission
+            request_screen_recording_permission,
+            close_window
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
