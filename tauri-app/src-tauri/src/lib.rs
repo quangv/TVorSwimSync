@@ -294,6 +294,33 @@ fn sync_to_tos(symbol: String, click_x: f64, click_y: f64) {
     });
 }
 
+/// Perform a test click at the saved target position to verify coordinates.
+#[tauri::command]
+fn test_click_target() {
+    if let Some(pos) = load_click_target() {
+        eprintln!("[test] clicking at saved target ({}, {})", pos.x, pos.y);
+        let point = CGPoint::new(pos.x, pos.y);
+        let source = CGEventSource::new(CGEventSourceStateID::HIDSystemState).unwrap();
+        let mouse_down = CGEvent::new_mouse_event(
+            source.clone(),
+            CGEventType::LeftMouseDown,
+            point,
+            CGMouseButton::Left,
+        ).unwrap();
+        let mouse_up = CGEvent::new_mouse_event(
+            source.clone(),
+            CGEventType::LeftMouseUp,
+            point,
+            CGMouseButton::Left,
+        ).unwrap();
+        mouse_down.post(CGEventTapLocation::HID);
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        mouse_up.post(CGEventTapLocation::HID);
+    } else {
+        eprintln!("[test] no saved click target found");
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -377,7 +404,7 @@ pub fn run() {
                     if let Some(cal) = app_handle.get_webview_window("calibrate") {
                         let _ = cal.destroy();
                     }
-                    // Load saved click target and show a marker window at that position
+                    // Load saved click target, show marker AND perform a real click
                     if let Some(pos) = load_click_target() {
                         // Close existing test marker if any
                         if let Some(existing) = app_handle.get_webview_window("test_marker") {
@@ -397,6 +424,9 @@ pub fn run() {
                         .inner_size(marker_size, marker_size)
                         .position(pos.x - marker_size / 2.0, pos.y - marker_size / 2.0)
                         .build();
+
+                        // Also perform a real CGEvent click at the saved position
+                        test_click_target();
                     }
                 } else if event.id().as_ref() == "show_help" {
                     // Open a new help window
@@ -432,7 +462,8 @@ pub fn run() {
             load_click_target,
             check_screen_recording_permission,
             request_screen_recording_permission,
-            close_window
+            close_window,
+            test_click_target
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
