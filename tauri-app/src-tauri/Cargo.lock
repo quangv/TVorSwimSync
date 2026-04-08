@@ -3661,6 +3661,8 @@ dependencies = [
 name = "tauri-app"
 version = "0.1.0"
 dependencies = [
+ "core-foundation",
+ "core-graphics",
  "dirs",
  "serde",
  "serde_json",

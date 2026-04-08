@@ -1,6 +1,11 @@
+use core_foundation::base::TCFType;
+use core_foundation::string::CFString;
+use core_graphics::window::{
+    copy_window_info, kCGNullWindowID, kCGWindowListOptionOnScreenOnly, kCGWindowName,
+    kCGWindowOwnerName,
+};
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::process::Command;
 use std::sync::Mutex;
 use tauri::State;
 
@@ -28,47 +33,61 @@ fn state_file_path() -> std::path::PathBuf {
     path
 }
 
-fn run_applescript(script: &str) -> Option<String> {
-    let output = Command::new("osascript")
-        .arg("-e")
-        .arg(script)
-        .output()
-        .ok()?;
+/// Get the front window title for an app using Core Graphics.
+/// Iterates on-screen windows (front-to-back order) and returns the first
+/// title belonging to `owner_name`.
+fn get_window_title_for_app(owner_name: &str) -> Option<String> {
+    let windows = copy_window_info(kCGWindowListOptionOnScreenOnly, kCGNullWindowID)?;
 
-    if output.status.success() {
-        let s = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        if s.is_empty() {
-            None
-        } else {
-            Some(s)
+    let count = windows.len();
+    for i in 0..count {
+        let dict_ref = unsafe {
+            core_foundation::array::CFArrayGetValueAtIndex(
+                windows.as_concrete_TypeRef(),
+                i as isize,
+            )
+        };
+        if dict_ref.is_null() {
+            continue;
         }
-    } else {
-        None
+
+        let dict: core_foundation::dictionary::CFDictionary = unsafe {
+            TCFType::wrap_under_get_rule(
+                dict_ref as core_foundation::dictionary::CFDictionaryRef,
+            )
+        };
+
+        // Check owner name
+        let owner_cf_key = unsafe { CFString::wrap_under_get_rule(kCGWindowOwnerName as *const _) };
+        if let Some(val) = dict.find(owner_cf_key.as_CFTypeRef()) {
+            let owner_str: CFString = unsafe { TCFType::wrap_under_get_rule(*val as *const _) };
+            if owner_str.to_string() != owner_name {
+                continue;
+            }
+        } else {
+            continue;
+        }
+
+        // Get window title
+        let name_cf_key = unsafe { CFString::wrap_under_get_rule(kCGWindowName as *const _) };
+        if let Some(val) = dict.find(name_cf_key.as_CFTypeRef()) {
+            let title_str: CFString = unsafe { TCFType::wrap_under_get_rule(*val as *const _) };
+            let title = title_str.to_string();
+            if !title.is_empty() {
+                return Some(title);
+            }
+        }
     }
+
+    None
 }
 
 fn get_tradingview_title() -> Option<String> {
-    run_applescript(
-        r#"tell application "System Events"
-  if exists process "TradingView" then
-    tell process "TradingView"
-      return name of front window
-    end tell
-  end if
-end tell"#,
-    )
+    get_window_title_for_app("TradingView")
 }
 
 fn get_thinkorswim_title() -> Option<String> {
-    run_applescript(
-        r#"tell application "System Events"
-  if exists process "thinkorswim" then
-    tell process "thinkorswim"
-      return name of front window
-    end tell
-  end if
-end tell"#,
-    )
+    get_window_title_for_app("thinkorswim")
 }
 
 fn extract_symbol(title: &str, source: &str) -> Option<String> {
