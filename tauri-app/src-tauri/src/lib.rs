@@ -353,6 +353,10 @@ pub fn run() {
                     };
                     let _ = sync_item.set_text(label);
                 } else if event.id().as_ref() == "setup_sync" {
+                    // Close test marker if it's open
+                    if let Some(marker) = app_handle.get_webview_window("test_marker") {
+                        let _ = marker.destroy();
+                    }
                     if let Some(existing) = app_handle.get_webview_window("calibrate") {
                         let _ = existing.set_focus();
                     } else {
@@ -369,6 +373,10 @@ pub fn run() {
                         .build();
                     }
                 } else if event.id().as_ref() == "test_target" {
+                    // Close calibrate window if it's open
+                    if let Some(cal) = app_handle.get_webview_window("calibrate") {
+                        let _ = cal.destroy();
+                    }
                     // Load saved click target and show a marker window at that position
                     if let Some(pos) = load_click_target() {
                         // Close existing test marker if any

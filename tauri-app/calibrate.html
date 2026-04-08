@@ -76,6 +76,16 @@
       const crosshairH = document.getElementById('crosshair-h');
       const crosshairV = document.getElementById('crosshair-v');
 
+      // Cache window position and scale on load so click handler is synchronous
+      let winX = 0, winY = 0, scale = 1;
+      (async () => {
+        const win = getCurrentWindow();
+        const pos = await win.outerPosition();
+        scale = await win.scaleFactor();
+        winX = pos.x / scale;
+        winY = pos.y / scale;
+      })();
+
       document.addEventListener('mousemove', (e) => {
         tooltip.style.left = e.clientX + 'px';
         tooltip.style.top = e.clientY + 'px';
@@ -83,17 +93,16 @@
         crosshairV.style.left = e.clientX + 'px';
       });
 
-      document.addEventListener('click', async (e) => {
-        const screenX = e.screenX;
-        const screenY = e.screenY;
+      document.addEventListener('click', (e) => {
+        const screenX = winX + e.clientX;
+        const screenY = winY + e.clientY;
         // Rust command will save and close this window
-        await invoke('save_click_target', { x: screenX, y: screenY });
+        invoke('save_click_target', { x: screenX, y: screenY });
       });
 
-      document.addEventListener('keydown', async (e) => {
+      document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
-          const win = getCurrentWindow();
-          await win.close();
+          invoke('close_window', { label: 'calibrate' });
         }
       });
     </script>
