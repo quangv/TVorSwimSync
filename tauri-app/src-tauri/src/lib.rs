@@ -278,8 +278,7 @@ fn sync_to_tos(symbol: String, click_x: f64, click_y: f64) {
     // 1. Activate thinkorswim via osascript
     let script = r#"tell application "System Events"
     set frontmost of process "thinkorswim" to true
-end tell
-delay 0.15"#;
+end tell"#;
     eprintln!("[sync] activating thinkorswim...");
     let output = std::process::Command::new("osascript")
         .arg("-e")
@@ -301,7 +300,6 @@ delay 0.15"#;
     unsafe {
         CGDisplayMoveCursorToPoint(CGMainDisplayID(), point);
     }
-    std::thread::sleep(std::time::Duration::from_millis(20));
 
     let source = CGEventSource::new(CGEventSourceStateID::Private).unwrap();
 
@@ -321,9 +319,9 @@ delay 0.15"#;
     ).unwrap();
     mouse_up.set_integer_value_field(core_graphics::event::EventField::MOUSE_EVENT_CLICK_STATE, 1);
     mouse_down.post(CGEventTapLocation::HID);
-    std::thread::sleep(std::time::Duration::from_millis(10));
+    std::thread::sleep(std::time::Duration::from_millis(5));
     mouse_up.post(CGEventTapLocation::HID);
-    std::thread::sleep(std::time::Duration::from_millis(50));
+    std::thread::sleep(std::time::Duration::from_millis(30));
 
     // Second click (clickState = 2) — makes it a double-click
     let mouse_down2 = CGEvent::new_mouse_event(
@@ -341,10 +339,10 @@ delay 0.15"#;
     ).unwrap();
     mouse_up2.set_integer_value_field(core_graphics::event::EventField::MOUSE_EVENT_CLICK_STATE, 2);
     mouse_down2.post(CGEventTapLocation::HID);
-    std::thread::sleep(std::time::Duration::from_millis(10));
+    std::thread::sleep(std::time::Duration::from_millis(5));
     mouse_up2.post(CGEventTapLocation::HID);
 
-    std::thread::sleep(std::time::Duration::from_millis(150));
+    std::thread::sleep(std::time::Duration::from_millis(50));
 
     // 3. Type each character via CGEvent
     for ch in symbol.chars() {
@@ -353,12 +351,12 @@ delay 0.15"#;
         let event_up = CGEvent::new_keyboard_event(src, 0, false).unwrap();
         event_down.set_string(&ch.to_string());
         event_down.post(CGEventTapLocation::HID);
-        std::thread::sleep(std::time::Duration::from_millis(5));
+        std::thread::sleep(std::time::Duration::from_millis(2));
         event_up.post(CGEventTapLocation::HID);
-        std::thread::sleep(std::time::Duration::from_millis(20));
+        std::thread::sleep(std::time::Duration::from_millis(10));
     }
 
-    std::thread::sleep(std::time::Duration::from_millis(30));
+    std::thread::sleep(std::time::Duration::from_millis(10));
 
     // 4. Press Enter
     let src = CGEventSource::new(CGEventSourceStateID::Private).unwrap();
