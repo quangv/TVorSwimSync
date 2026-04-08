@@ -12,8 +12,8 @@ use std::fs;
 use std::sync::Mutex;
 use tauri::State;
 use tauri::Manager;
-use tauri::menu::{MenuBuilder, MenuItemBuilder, PredefinedMenuItem, SubmenuBuilder};
-use tauri::{Emitter, WebviewWindowBuilder, WebviewUrl};
+use tauri::menu::{MenuBuilder, MenuItemBuilder, SubmenuBuilder};
+use tauri::{WebviewWindowBuilder, WebviewUrl};
 use std::sync::atomic::{AtomicBool, Ordering};
 
 static SYNC_ENABLED: AtomicBool = AtomicBool::new(cfg!(debug_assertions));
@@ -97,69 +97,6 @@ fn get_window_title_for_app(owner_name: &str) -> Option<String> {
     }
 
     None
-}
-
-/// Log all on-screen window owners and titles (for debugging).
-/// Only logs once every ~10 seconds to avoid spam.
-fn debug_log_all_windows() {
-    use std::sync::atomic::{AtomicU64, Ordering};
-    static LAST_LOG: AtomicU64 = AtomicU64::new(0);
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs();
-    let last = LAST_LOG.load(Ordering::Relaxed);
-    if now - last < 10 {
-        return;
-    }
-    LAST_LOG.store(now, Ordering::Relaxed);
-
-    if let Some(windows) = copy_window_info(kCGWindowListOptionOnScreenOnly, kCGNullWindowID) {
-        let count = windows.len();
-        eprintln!("[debug] === All on-screen windows ({} total) ===", count);
-        for i in 0..count {
-            let dict_ref = unsafe {
-                core_foundation::array::CFArrayGetValueAtIndex(
-                    windows.as_concrete_TypeRef(),
-                    i as isize,
-                )
-            };
-            if dict_ref.is_null() {
-                continue;
-            }
-            let dict: core_foundation::dictionary::CFDictionary = unsafe {
-                TCFType::wrap_under_get_rule(
-                    dict_ref as core_foundation::dictionary::CFDictionaryRef,
-                )
-            };
-
-            let owner_cf_key =
-                unsafe { CFString::wrap_under_get_rule(kCGWindowOwnerName as *const _) };
-            let name_cf_key =
-                unsafe { CFString::wrap_under_get_rule(kCGWindowName as *const _) };
-
-            let owner = dict
-                .find(owner_cf_key.as_CFTypeRef())
-                .map(|val| {
-                    let s: CFString = unsafe { TCFType::wrap_under_get_rule(*val as *const _) };
-                    s.to_string()
-                })
-                .unwrap_or_else(|| "<no owner>".to_string());
-
-            let title = dict
-                .find(name_cf_key.as_CFTypeRef())
-                .map(|val| {
-                    let s: CFString = unsafe { TCFType::wrap_under_get_rule(*val as *const _) };
-                    s.to_string()
-                })
-                .unwrap_or_else(|| "<no title>".to_string());
-
-            if owner.contains("Trading") || owner.contains("thinkorswim") || owner.contains("Google") || owner.contains("Chrome") || owner.contains("Safari") || owner.contains("Arc") || owner.contains("Firefox") || owner.contains("Brave") {
-                eprintln!("[debug]   owner={:?}  title={:?}", owner, title);
-            }
-        }
-        eprintln!("[debug] === end ===");
-    }
 }
 
 extern "C" {
@@ -288,52 +225,73 @@ fn load_click_target() -> Option<SavedPosition> {
 }
 
 /// Click at the saved target position, type the symbol, press Enter.
-/// click_x/click_y are in screen points.
+/// click_x/click_y are in screen points (logical, not physical).
 #[tauri::command]
 fn sync_to_tos(symbol: String, click_x: f64, click_y: f64) {
-    let point = CGPoint::new(click_x, click_y);
+    // Run in a separate thread so we don't block the main/webview thread
+    std::thread::spawn(move || {
+        let point = CGPoint::new(click_x, click_y);
 
-    eprintln!("[sync] clicking at screen point ({}, {})", click_x, click_y);
-    eprintln!("[sync] typing symbol: {}", symbol);
+        eprintln!("[sync] clicking at screen point ({}, {})", click_x, click_y);
+        eprintln!("[sync] typing symbol: {}", symbol);
 
-    let source = CGEventSource::new(CGEventSourceStateID::HIDSystemState).unwrap();
+        let source = CGEventSource::new(CGEventSourceStateID::HIDSystemState).unwrap();
 
-    // Click to focus the input field
-    let mouse_down = CGEvent::new_mouse_event(
-        source.clone(),
-        CGEventType::LeftMouseDown,
-        point,
-        CGMouseButton::Left,
-    ).unwrap();
-    let mouse_up = CGEvent::new_mouse_event(
-        source.clone(),
-        CGEventType::LeftMouseUp,
-        point,
-        CGMouseButton::Left,
-    ).unwrap();
-    mouse_down.post(CGEventTapLocation::HID);
-    mouse_up.post(CGEventTapLocation::HID);
+        // Click to focus the input field
+        let mouse_down = CGEvent::new_mouse_event(
+            source.clone(),
+            CGEventType::LeftMouseDown,
+            point,
+            CGMouseButton::Left,
+        ).unwrap();
+        let mouse_up = CGEvent::new_mouse_event(
+            source.clone(),
+            CGEventType::LeftMouseUp,
+            point,
+            CGMouseButton::Left,
+        ).unwrap();
+        mouse_down.post(CGEventTapLocation::HID);
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        mouse_up.post(CGEventTapLocation::HID);
 
-    std::thread::sleep(std::time::Duration::from_millis(100));
+        std::thread::sleep(std::time::Duration::from_millis(200));
 
-    // Type each character of the symbol via CGEvent
-    for ch in symbol.chars() {
-        let event_down = CGEvent::new_keyboard_event(source.clone(), 0, true).unwrap();
-        let event_up = CGEvent::new_keyboard_event(source.clone(), 0, false).unwrap();
-        let utf16: Vec<u16> = ch.encode_utf16(&mut [0; 2]).to_vec();
-        event_down.set_string_from_utf16_unchecked(&utf16);
-        event_down.post(CGEventTapLocation::HID);
-        event_up.post(CGEventTapLocation::HID);
-        std::thread::sleep(std::time::Duration::from_millis(30));
-    }
+        // Select all existing text (Cmd+A) so new typing replaces it
+        let select_all_down = CGEvent::new_keyboard_event(source.clone(), 0, true).unwrap();
+        let select_all_up = CGEvent::new_keyboard_event(source.clone(), 0, false).unwrap();
+        select_all_down.set_flags(core_graphics::event::CGEventFlags::CGEventFlagCommand);
+        select_all_up.set_flags(core_graphics::event::CGEventFlags::CGEventFlagCommand);
+        let a_utf16: Vec<u16> = 'a'.encode_utf16(&mut [0; 2]).to_vec();
+        select_all_down.set_string_from_utf16_unchecked(&a_utf16);
+        select_all_down.post(CGEventTapLocation::HID);
+        std::thread::sleep(std::time::Duration::from_millis(10));
+        select_all_up.post(CGEventTapLocation::HID);
 
-    std::thread::sleep(std::time::Duration::from_millis(50));
+        std::thread::sleep(std::time::Duration::from_millis(100));
 
-    // Press Enter (keycode 36)
-    let enter_down = CGEvent::new_keyboard_event(source.clone(), 36, true).unwrap();
-    enter_down.post(CGEventTapLocation::HID);
-    let enter_up = CGEvent::new_keyboard_event(source.clone(), 36, false).unwrap();
-    enter_up.post(CGEventTapLocation::HID);
+        // Type each character of the symbol via CGEvent
+        for ch in symbol.chars() {
+            let event_down = CGEvent::new_keyboard_event(source.clone(), 0, true).unwrap();
+            let event_up = CGEvent::new_keyboard_event(source.clone(), 0, false).unwrap();
+            let utf16: Vec<u16> = ch.encode_utf16(&mut [0; 2]).to_vec();
+            event_down.set_string_from_utf16_unchecked(&utf16);
+            event_down.post(CGEventTapLocation::HID);
+            std::thread::sleep(std::time::Duration::from_millis(10));
+            event_up.post(CGEventTapLocation::HID);
+            std::thread::sleep(std::time::Duration::from_millis(50));
+        }
+
+        std::thread::sleep(std::time::Duration::from_millis(100));
+
+        // Press Enter (keycode 36)
+        let enter_down = CGEvent::new_keyboard_event(source.clone(), 36, true).unwrap();
+        enter_down.post(CGEventTapLocation::HID);
+        std::thread::sleep(std::time::Duration::from_millis(10));
+        let enter_up = CGEvent::new_keyboard_event(source.clone(), 36, false).unwrap();
+        enter_up.post(CGEventTapLocation::HID);
+
+        eprintln!("[sync] done");
+    });
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
