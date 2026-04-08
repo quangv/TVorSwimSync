@@ -292,6 +292,14 @@ fn sync_to_tos(symbol: String, window_x: f64, window_y: f64, window_width: f64, 
         event_up.post(CGEventTapLocation::HID);
         std::thread::sleep(std::time::Duration::from_millis(20));
     }
+
+    std::thread::sleep(std::time::Duration::from_millis(50));
+
+    // Press Enter (keycode 36)
+    let enter_down = CGEvent::new_keyboard_event(source.clone(), 36, true).unwrap();
+    enter_down.post(CGEventTapLocation::HID);
+    let enter_up = CGEvent::new_keyboard_event(source.clone(), 36, false).unwrap();
+    enter_up.post(CGEventTapLocation::HID);
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
