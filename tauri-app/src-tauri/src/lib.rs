@@ -371,6 +371,27 @@ delay 0.3"#;
     eprintln!("[sync] done");
 }
 
+/// Full auto-sync: hide window, sync, show window, deactivate.
+/// Mirrors the test_sync_nvda flow exactly.
+#[tauri::command]
+fn auto_sync(symbol: String, app_handle: tauri::AppHandle) {
+    if let Some(pos) = load_click_target() {
+        let main_win = app_handle.get_webview_window("main");
+        std::thread::spawn(move || {
+            if let Some(ref win) = main_win {
+                let _ = win.hide();
+            }
+            std::thread::sleep(std::time::Duration::from_millis(200));
+            sync_to_tos(symbol, pos.x, pos.y);
+            std::thread::sleep(std::time::Duration::from_millis(500));
+            if let Some(ref win) = main_win {
+                let _ = win.show();
+            }
+            deactivate_app();
+        });
+    }
+}
+
 /// Perform a test click at the saved target position to verify coordinates.
 #[tauri::command]
 fn test_click_target() {
@@ -565,6 +586,7 @@ pub fn run() {
             save_position,
             load_position,
             sync_to_tos,
+            auto_sync,
             get_sync_enabled,
             save_click_target,
             load_click_target,
