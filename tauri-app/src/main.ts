@@ -5,6 +5,8 @@ interface SymbolState {
   tradingview_symbol: string | null;
   thinkorswim_symbol: string | null;
   matched: boolean;
+  raw_tv_title: string | null;
+  raw_tos_title: string | null;
 }
 
 interface SavedPosition {
@@ -17,6 +19,34 @@ const SAVE_DEBOUNCE_MS = 500;
 
 const emojiEl = document.getElementById("emoji")!;
 const symbolEl = document.getElementById("symbol")!;
+const permBanner = document.getElementById("perm-banner")!;
+
+let hasScreenPermission = true;
+
+async function checkPermission() {
+  try {
+    hasScreenPermission = await invoke<boolean>(
+      "check_screen_recording_permission",
+    );
+    if (!hasScreenPermission) {
+      permBanner.style.display = "flex";
+    } else {
+      permBanner.style.display = "none";
+    }
+  } catch {
+    // ignore
+  }
+}
+
+permBanner.addEventListener("click", async () => {
+  try {
+    await invoke<boolean>("request_screen_recording_permission");
+    // Re-check after a short delay (user may need to toggle in Settings)
+    setTimeout(checkPermission, 2000);
+  } catch {
+    // ignore
+  }
+});
 
 async function restorePosition() {
   try {
@@ -54,6 +84,15 @@ async function pollSymbols() {
   try {
     const state = await invoke<SymbolState>("poll_symbols");
 
+    console.log("[debug] raw_tv_title:", state.raw_tv_title);
+    console.log("[debug] raw_tos_title:", state.raw_tos_title);
+    console.log(
+      "[debug] extracted TV:",
+      state.tradingview_symbol,
+      "ToS:",
+      state.thinkorswim_symbol,
+    );
+
     if (state.tradingview_symbol) {
       symbolEl.textContent = state.tradingview_symbol;
     } else {
@@ -68,5 +107,8 @@ async function pollSymbols() {
 
 // Initialize
 restorePosition();
+checkPermission();
 pollSymbols();
 setInterval(pollSymbols, POLL_INTERVAL_MS);
+// Re-check permission periodically in case user grants it
+setInterval(checkPermission, 5000);

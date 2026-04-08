@@ -8,12 +8,15 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::sync::Mutex;
 use tauri::State;
+use tauri::menu::Menu;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SymbolState {
     pub tradingview_symbol: Option<String>,
     pub thinkorswim_symbol: Option<String>,
     pub matched: bool,
+    pub raw_tv_title: Option<String>,
+    pub raw_tos_title: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -82,6 +85,84 @@ fn get_window_title_for_app(owner_name: &str) -> Option<String> {
     None
 }
 
+/// Log all on-screen window owners and titles (for debugging).
+/// Only logs once every ~10 seconds to avoid spam.
+fn debug_log_all_windows() {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static LAST_LOG: AtomicU64 = AtomicU64::new(0);
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+    let last = LAST_LOG.load(Ordering::Relaxed);
+    if now - last < 10 {
+        return;
+    }
+    LAST_LOG.store(now, Ordering::Relaxed);
+
+    if let Some(windows) = copy_window_info(kCGWindowListOptionOnScreenOnly, kCGNullWindowID) {
+        let count = windows.len();
+        eprintln!("[debug] === All on-screen windows ({} total) ===", count);
+        for i in 0..count {
+            let dict_ref = unsafe {
+                core_foundation::array::CFArrayGetValueAtIndex(
+                    windows.as_concrete_TypeRef(),
+                    i as isize,
+                )
+            };
+            if dict_ref.is_null() {
+                continue;
+            }
+            let dict: core_foundation::dictionary::CFDictionary = unsafe {
+                TCFType::wrap_under_get_rule(
+                    dict_ref as core_foundation::dictionary::CFDictionaryRef,
+                )
+            };
+
+            let owner_cf_key =
+                unsafe { CFString::wrap_under_get_rule(kCGWindowOwnerName as *const _) };
+            let name_cf_key =
+                unsafe { CFString::wrap_under_get_rule(kCGWindowName as *const _) };
+
+            let owner = dict
+                .find(owner_cf_key.as_CFTypeRef())
+                .map(|val| {
+                    let s: CFString = unsafe { TCFType::wrap_under_get_rule(*val as *const _) };
+                    s.to_string()
+                })
+                .unwrap_or_else(|| "<no owner>".to_string());
+
+            let title = dict
+                .find(name_cf_key.as_CFTypeRef())
+                .map(|val| {
+                    let s: CFString = unsafe { TCFType::wrap_under_get_rule(*val as *const _) };
+                    s.to_string()
+                })
+                .unwrap_or_else(|| "<no title>".to_string());
+
+            if owner.contains("Trading") || owner.contains("thinkorswim") || owner.contains("Google") || owner.contains("Chrome") || owner.contains("Safari") || owner.contains("Arc") || owner.contains("Firefox") || owner.contains("Brave") {
+                eprintln!("[debug]   owner={:?}  title={:?}", owner, title);
+            }
+        }
+        eprintln!("[debug] === end ===");
+    }
+}
+
+extern "C" {
+    fn CGPreflightScreenCaptureAccess() -> bool;
+    fn CGRequestScreenCaptureAccess() -> bool;
+}
+
+#[tauri::command]
+fn check_screen_recording_permission() -> bool {
+    unsafe { CGPreflightScreenCaptureAccess() }
+}
+
+#[tauri::command]
+fn request_screen_recording_permission() -> bool {
+    unsafe { CGRequestScreenCaptureAccess() }
+}
+
 fn get_tradingview_title() -> Option<String> {
     get_window_title_for_app("TradingView")
 }
@@ -117,8 +198,13 @@ fn extract_symbol(title: &str, source: &str) -> Option<String> {
 
 #[tauri::command]
 fn poll_symbols(state: State<AppState>) -> SymbolState {
+    debug_log_all_windows();
+
     let tv_title = get_tradingview_title();
     let tos_title = get_thinkorswim_title();
+
+    eprintln!("[debug] TV raw title: {:?}", tv_title);
+    eprintln!("[debug] ToS raw title: {:?}", tos_title);
 
     if let Some(ref t) = tv_title {
         *state.last_tv_title.lock().unwrap() = Some(t.clone());
@@ -134,6 +220,8 @@ fn poll_symbols(state: State<AppState>) -> SymbolState {
         .as_deref()
         .and_then(|t| extract_symbol(t, "thinkorswim"));
 
+    eprintln!("[debug] Extracted TV symbol: {:?}, ToS symbol: {:?}", tv_sym, tos_sym);
+
     let matched = match (&tv_sym, &tos_sym) {
         (Some(a), Some(b)) => a == b,
         _ => true, // if either is missing, don't alarm
@@ -143,6 +231,8 @@ fn poll_symbols(state: State<AppState>) -> SymbolState {
         tradingview_symbol: tv_sym,
         thinkorswim_symbol: tos_sym,
         matched,
+        raw_tv_title: tv_title,
+        raw_tos_title: tos_title,
     }
 }
 
@@ -164,6 +254,11 @@ fn load_position() -> Option<SavedPosition> {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .setup(|app| {
+            let menu = Menu::new(app)?;
+            app.set_menu(menu)?;
+            Ok(())
+        })
         .manage(AppState {
             last_tv_title: Mutex::new(None),
             last_tos_title: Mutex::new(None),
@@ -171,7 +266,9 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             poll_symbols,
             save_position,
-            load_position
+            load_position,
+            check_screen_recording_permission,
+            request_screen_recording_permission
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
