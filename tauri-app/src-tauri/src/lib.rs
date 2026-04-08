@@ -279,7 +279,7 @@ fn sync_to_tos(symbol: String, click_x: f64, click_y: f64) {
     let script = r#"tell application "System Events"
     set frontmost of process "thinkorswim" to true
 end tell
-delay 0.3"#;
+delay 0.15"#;
     eprintln!("[sync] activating thinkorswim...");
     let output = std::process::Command::new("osascript")
         .arg("-e")
@@ -301,7 +301,7 @@ delay 0.3"#;
     unsafe {
         CGDisplayMoveCursorToPoint(CGMainDisplayID(), point);
     }
-    std::thread::sleep(std::time::Duration::from_millis(50));
+    std::thread::sleep(std::time::Duration::from_millis(20));
 
     let source = CGEventSource::new(CGEventSourceStateID::Private).unwrap();
 
@@ -344,7 +344,7 @@ delay 0.3"#;
     std::thread::sleep(std::time::Duration::from_millis(10));
     mouse_up2.post(CGEventTapLocation::HID);
 
-    std::thread::sleep(std::time::Duration::from_millis(500));
+    std::thread::sleep(std::time::Duration::from_millis(150));
 
     // 3. Type each character via CGEvent
     for ch in symbol.chars() {
@@ -353,12 +353,12 @@ delay 0.3"#;
         let event_up = CGEvent::new_keyboard_event(src, 0, false).unwrap();
         event_down.set_string(&ch.to_string());
         event_down.post(CGEventTapLocation::HID);
-        std::thread::sleep(std::time::Duration::from_millis(10));
+        std::thread::sleep(std::time::Duration::from_millis(5));
         event_up.post(CGEventTapLocation::HID);
-        std::thread::sleep(std::time::Duration::from_millis(50));
+        std::thread::sleep(std::time::Duration::from_millis(20));
     }
 
-    std::thread::sleep(std::time::Duration::from_millis(100));
+    std::thread::sleep(std::time::Duration::from_millis(30));
 
     // 4. Press Enter
     let src = CGEventSource::new(CGEventSourceStateID::Private).unwrap();
@@ -377,7 +377,7 @@ fn auto_sync(symbol: String, _app_handle: tauri::AppHandle) {
     if let Some(pos) = load_click_target() {
         std::thread::spawn(move || {
             sync_to_tos(symbol, pos.x, pos.y);
-            std::thread::sleep(std::time::Duration::from_millis(500));
+            std::thread::sleep(std::time::Duration::from_millis(200));
             deactivate_app();
         });
     }
