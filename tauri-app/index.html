@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="stylesheet" href="/src/styles.css" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TVorSwimSync</title>
+    <script type="module" src="/src/main.ts" defer></script>
+  </head>
+  <body class="bg-transparent">
+    <div
+      id="app"
+      data-tauri-drag-region
+      class="flex flex-col items-center justify-center w-[120px] h-[120px] cursor-move"
+    >
+      <div id="emoji" class="text-[72px] leading-none select-none pointer-events-none">🌊</div>
+      <div id="symbol" class="text-[18px] font-bold text-black/90 select-none pointer-events-none mt-[-8px]">--</div>
+    </div>
+  </body>
+</html>
