@@ -371,22 +371,13 @@ delay 0.3"#;
     eprintln!("[sync] done");
 }
 
-/// Full auto-sync: hide window, sync, show window, deactivate.
-/// Mirrors the test_sync_nvda flow exactly.
+/// Full auto-sync: sync symbol to thinkorswim, then deactivate our app.
 #[tauri::command]
-fn auto_sync(symbol: String, app_handle: tauri::AppHandle) {
+fn auto_sync(symbol: String, _app_handle: tauri::AppHandle) {
     if let Some(pos) = load_click_target() {
-        let main_win = app_handle.get_webview_window("main");
         std::thread::spawn(move || {
-            if let Some(ref win) = main_win {
-                let _ = win.hide();
-            }
-            std::thread::sleep(std::time::Duration::from_millis(200));
             sync_to_tos(symbol, pos.x, pos.y);
             std::thread::sleep(std::time::Duration::from_millis(500));
-            if let Some(ref win) = main_win {
-                let _ = win.show();
-            }
             deactivate_app();
         });
     }
@@ -532,21 +523,9 @@ pub fn run() {
                     }
                 } else if event.id().as_ref() == "test_sync_nvda" {
                     if let Some(pos) = load_click_target() {
-                        let app_clone = app_handle.clone();
                         std::thread::spawn(move || {
-                            // Hide main window so it doesn't intercept clicks
-                            if let Some(main_win) = app_clone.get_webview_window("main") {
-                                let _ = main_win.hide();
-                            }
-                            // Wait for window to fully hide
-                            std::thread::sleep(std::time::Duration::from_millis(200));
                             sync_to_tos("NVDA".to_string(), pos.x, pos.y);
-                            // Wait for TOS to process the Enter
                             std::thread::sleep(std::time::Duration::from_millis(500));
-                            if let Some(main_win) = app_clone.get_webview_window("main") {
-                                let _ = main_win.show();
-                            }
-                            // Deactivate our app so we don't steal focus
                             deactivate_app();
                         });
                     }
