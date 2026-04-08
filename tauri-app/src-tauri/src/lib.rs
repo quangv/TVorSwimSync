@@ -307,7 +307,7 @@ fn sync_to_tos(symbol: String, click_x: f64, click_y: f64) {
     mouse_down.post(CGEventTapLocation::HID);
     mouse_up.post(CGEventTapLocation::HID);
 
-    std::thread::sleep(std::time::Duration::from_secs(1));
+    std::thread::sleep(std::time::Duration::from_millis(100));
 
     // Type each character of the symbol via CGEvent
     for ch in symbol.chars() {
@@ -317,10 +317,10 @@ fn sync_to_tos(symbol: String, click_x: f64, click_y: f64) {
         event_down.set_string_from_utf16_unchecked(&utf16);
         event_down.post(CGEventTapLocation::HID);
         event_up.post(CGEventTapLocation::HID);
-        std::thread::sleep(std::time::Duration::from_secs(1));
+        std::thread::sleep(std::time::Duration::from_millis(30));
     }
 
-    std::thread::sleep(std::time::Duration::from_secs(1));
+    std::thread::sleep(std::time::Duration::from_millis(50));
 
     // Press Enter (keycode 36)
     let enter_down = CGEvent::new_keyboard_event(source.clone(), 36, true).unwrap();
@@ -340,6 +340,9 @@ pub fn run() {
             let setup_item = MenuItemBuilder::new("Setup Auto-Sync Target...")
                 .id("setup_sync")
                 .build(app)?;
+            let test_item = MenuItemBuilder::new("Test Target")
+                .id("test_target")
+                .build(app)?;
             let disclaimer = MenuItemBuilder::new("⚠ Beta software – use at your own risk")
                 .id("disclaimer")
                 .enabled(false)
@@ -352,6 +355,7 @@ pub fn run() {
             let app_submenu = SubmenuBuilder::new(app, "TVorSwimSync")
                 .item(&sync_item)
                 .item(&setup_item)
+                .item(&test_item)
                 .separator()
                 .item(&disclaimer)
                 .separator()
@@ -392,6 +396,28 @@ pub fn run() {
                         .decorations(false)
                         .always_on_top(true)
                         .maximized(true)
+                        .build();
+                    }
+                } else if event.id().as_ref() == "test_target" {
+                    // Load saved click target and show a marker window at that position
+                    if let Some(pos) = load_click_target() {
+                        // Close existing test marker if any
+                        if let Some(existing) = app_handle.get_webview_window("test_marker") {
+                            let _ = existing.destroy();
+                        }
+                        let marker_size = 60.0;
+                        let _ = WebviewWindowBuilder::new(
+                            app_handle,
+                            "test_marker",
+                            WebviewUrl::App("test-marker.html".into()),
+                        )
+                        .title("")
+                        .transparent(true)
+                        .decorations(false)
+                        .always_on_top(true)
+                        .skip_taskbar(true)
+                        .inner_size(marker_size, marker_size)
+                        .position(pos.x - marker_size / 2.0, pos.y - marker_size / 2.0)
                         .build();
                     }
                 } else if event.id().as_ref() == "show_help" {
