@@ -22,6 +22,8 @@ const symbolEl = document.getElementById("symbol")!;
 const permBanner = document.getElementById("perm-banner")!;
 
 let hasScreenPermission = true;
+let lastTvSymbol: string | null = null;
+let syncing = false;
 
 async function checkPermission() {
   try {
@@ -98,6 +100,34 @@ async function pollSymbols() {
     } else {
       symbolEl.textContent = "--";
     }
+
+    // Auto-sync: when TV symbol changes, type it into thinkorswim input below the widget
+    if (
+      state.tradingview_symbol &&
+      state.tradingview_symbol !== lastTvSymbol &&
+      lastTvSymbol !== null &&
+      !syncing
+    ) {
+      syncing = true;
+      try {
+        const win = getCurrentWindow();
+        const pos = await win.outerPosition();
+        const size = await win.outerSize();
+        const scaleFactor = await win.scaleFactor();
+        await invoke("sync_to_tos", {
+          symbol: state.tradingview_symbol,
+          windowX: pos.x,
+          windowY: pos.y,
+          windowWidth: size.width,
+          windowHeight: size.height,
+          scaleFactor,
+        });
+      } catch {
+        // ignore sync errors
+      }
+      syncing = false;
+    }
+    lastTvSymbol = state.tradingview_symbol;
 
     emojiEl.textContent = state.matched ? "🌊" : "🛑";
 

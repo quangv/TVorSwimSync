@@ -1,5 +1,8 @@
 use core_foundation::base::TCFType;
 use core_foundation::string::CFString;
+use core_graphics::event::{CGEvent, CGEventTapLocation, CGEventType, CGMouseButton};
+use core_graphics::event_source::{CGEventSource, CGEventSourceStateID};
+use core_graphics::geometry::CGPoint;
 use core_graphics::window::{
     copy_window_info, kCGNullWindowID, kCGWindowListOptionOnScreenOnly, kCGWindowName,
     kCGWindowOwnerName,
@@ -250,6 +253,47 @@ fn load_position() -> Option<SavedPosition> {
     serde_json::from_str(&data).ok()
 }
 
+/// Click 20px below the app window (horizontally centered), select all, type the symbol, press Enter.
+/// Coordinates are in physical pixels — we convert to screen points using the scale factor.
+#[tauri::command]
+fn sync_to_tos(symbol: String, window_x: f64, window_y: f64, window_width: f64, window_height: f64, scale_factor: f64) {
+    let scale = if scale_factor > 0.0 { scale_factor } else { 2.0 };
+    let click_x = (window_x + window_width / 2.0) / scale;
+    let click_y = (window_y + window_height) / scale + 20.0;
+    let point = CGPoint::new(click_x, click_y);
+
+    let source = CGEventSource::new(CGEventSourceStateID::HIDSystemState).unwrap();
+
+    // Click to focus the input field
+    let mouse_down = CGEvent::new_mouse_event(
+        source.clone(),
+        CGEventType::LeftMouseDown,
+        point,
+        CGMouseButton::Left,
+    ).unwrap();
+    let mouse_up = CGEvent::new_mouse_event(
+        source.clone(),
+        CGEventType::LeftMouseUp,
+        point,
+        CGMouseButton::Left,
+    ).unwrap();
+    mouse_down.post(CGEventTapLocation::HID);
+    mouse_up.post(CGEventTapLocation::HID);
+
+    std::thread::sleep(std::time::Duration::from_millis(100));
+
+    // Type each character of the symbol via CGEvent
+    for ch in symbol.chars() {
+        let event_down = CGEvent::new_keyboard_event(source.clone(), 0, true).unwrap();
+        let event_up = CGEvent::new_keyboard_event(source.clone(), 0, false).unwrap();
+        let utf16: Vec<u16> = ch.encode_utf16(&mut [0; 2]).to_vec();
+        event_down.set_string_from_utf16_unchecked(&utf16);
+        event_down.post(CGEventTapLocation::HID);
+        event_up.post(CGEventTapLocation::HID);
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -267,6 +311,7 @@ pub fn run() {
             poll_symbols,
             save_position,
             load_position,
+            sync_to_tos,
             check_screen_recording_permission,
             request_screen_recording_permission
         ])
