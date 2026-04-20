@@ -348,27 +348,23 @@ end tell"#;
 
     std::thread::sleep(std::time::Duration::from_millis(50));
 
-    // 3. Type each character via CGEvent
-    for ch in symbol.chars() {
-        let src = CGEventSource::new(CGEventSourceStateID::Private).unwrap();
-        let event_down = CGEvent::new_keyboard_event(src.clone(), 0, true).unwrap();
-        let event_up = CGEvent::new_keyboard_event(src, 0, false).unwrap();
-        event_down.set_string(&ch.to_string());
-        event_down.post(CGEventTapLocation::HID);
-        std::thread::sleep(std::time::Duration::from_millis(2));
-        event_up.post(CGEventTapLocation::HID);
-        std::thread::sleep(std::time::Duration::from_millis(10));
-    }
-
-    std::thread::sleep(std::time::Duration::from_millis(10));
-
-    // 4. Press Enter
-    let src = CGEventSource::new(CGEventSourceStateID::Private).unwrap();
-    let enter_down = CGEvent::new_keyboard_event(src.clone(), 36, true).unwrap();
-    enter_down.post(CGEventTapLocation::HID);
-    std::thread::sleep(std::time::Duration::from_millis(10));
-    let enter_up = CGEvent::new_keyboard_event(src.clone(), 36, false).unwrap();
-    enter_up.post(CGEventTapLocation::HID);
+    // 3. Type the symbol and press Enter via osascript keystroke.
+    // This is layout-independent (works with Colemak, Dvorak, etc.) because
+    // AppleScript keystroke sends the unicode character, not a physical keycode.
+    // Sanitize to alphanumeric + safe symbol chars to prevent script injection.
+    let safe_symbol: String = symbol
+        .to_lowercase()
+        .chars()
+        .filter(|c| c.is_alphanumeric() || *c == '.' || *c == '-' || *c == '!')
+        .collect();
+    let type_script = format!(
+        "tell application \"System Events\"\nkeystroke \"{}\"\nkey code 36\nend tell",
+        safe_symbol
+    );
+    let _ = std::process::Command::new("osascript")
+        .arg("-e")
+        .arg(&type_script)
+        .output();
 
     // 5. Restore mouse to original position
     if let Ok(pos) = original_pos {
