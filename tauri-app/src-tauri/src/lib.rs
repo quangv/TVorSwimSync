@@ -442,6 +442,9 @@ pub fn run() {
                 .enabled(false)
                 .build(app)?;
 
+            let about_item = MenuItemBuilder::new("About TVorSwimSync")
+                .id("show_about")
+                .build(app)?;
             let help_item = MenuItemBuilder::new("Sync Positioning Help")
                 .id("show_help")
                 .build(app)?;
@@ -458,6 +461,7 @@ pub fn run() {
                 .build()?;
 
             let help_submenu = SubmenuBuilder::new(app, "Help")
+                .item(&about_item)
                 .item(&help_item)
                 .build()?;
 
@@ -533,6 +537,21 @@ pub fn run() {
                             std::thread::sleep(std::time::Duration::from_millis(500));
                             deactivate_app();
                         });
+                    }
+                } else if event.id().as_ref() == "show_about" {
+                    // Open About window
+                    if let Some(existing) = app_handle.get_webview_window("about") {
+                        let _ = existing.set_focus();
+                    } else {
+                        let _ = WebviewWindowBuilder::new(
+                            app_handle,
+                            "about",
+                            WebviewUrl::App("about.html".into()),
+                        )
+                        .title("About TVorSwimSync")
+                        .inner_size(420.0, 480.0)
+                        .resizable(false)
+                        .build();
                     }
                 } else if event.id().as_ref() == "show_help" {
                     // Open a new help window
