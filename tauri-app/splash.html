@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8" />
+    <title>TVorSwimSync</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .splash-container {
+            text-align: center;
+            background: white;
+            border-radius: 16px;
+            padding: 60px 48px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 480px;
+            width: 90%;
+        }
+        h1 {
+            font-size: 36px;
+            margin-bottom: 16px;
+            color: #333;
+            font-weight: 600;
+        }
+        .version {
+            font-size: 14px;
+            color: #999;
+            margin-bottom: 32px;
+            letter-spacing: 0.5px;
+        }
+        .tagline {
+            font-size: 16px;
+            color: #666;
+            margin-bottom: 40px;
+            line-height: 1.6;
+        }
+        .checkbox-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 28px;
+            gap: 10px;
+        }
+        input[type="checkbox"] {
+            cursor: pointer;
+            width: 16px;
+            height: 16px;
+            accent-color: #667eea;
+        }
+        label {
+            cursor: pointer;
+            font-size: 13px;
+            color: #666;
+            user-select: none;
+        }
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 32px;
+            border-radius: 8px;
+            font-size: 15px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        button:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        button:active {
+            opacity: 0.8;
+            transform: translateY(0);
+        }
+    </style>
+</head>
+<body>
+    <div class="splash-container">
+        <h1>TVorSwimSync</h1>
+        <div class="version">Version <span id="version">loading...</span></div>
+        <div class="tagline">Auto-sync stock symbols between TradingView and thinkorswim</div>
+        
+        <div class="checkbox-container">
+            <input type="checkbox" id="dont-show-again" />
+            <label for="dont-show-again">Don't show again on startup</label>
+        </div>
+        
+        <button id="continue-btn">Continue</button>
+    </div>
+
+    <script>
+        // Load version
+        (async function() {
+            try {
+                if (window.__TAURI__ && window.__TAURI__.core) {
+                    const version = await window.__TAURI__.core.invoke('get_app_version');
+                    document.getElementById('version').textContent = version;
+                }
+            } catch (e) {
+                // Silently fail
+            }
+        })();
+
+        async function closeSplash() {
+            try {
+                const dontShowAgain = document.getElementById('dont-show-again').checked;
+                if (dontShowAgain && window.__TAURI__ && window.__TAURI__.core) {
+                    await window.__TAURI__.core.invoke('disable_splash_screen');
+                }
+            } catch (e) {
+                console.error('Error disabling splash:', e);
+            }
+
+            // Close this window (backend command is most reliable across Tauri API variants)
+            try {
+                if (window.__TAURI__ && window.__TAURI__.core) {
+                    await window.__TAURI__.core.invoke('close_splash_window');
+                    return;
+                }
+
+                if (window.__TAURI__ && window.__TAURI__.window) {
+                    const { getCurrentWindow } = window.__TAURI__.window;
+                    if (typeof getCurrentWindow === 'function') {
+                        const current = getCurrentWindow();
+                        if (current && typeof current.close === 'function') {
+                            await current.close();
+                            return;
+                        }
+                    }
+
+                    const { getCurrent } = window.__TAURI__.window;
+                    if (typeof getCurrent === 'function') {
+                        const currentLegacy = getCurrent();
+                        if (currentLegacy && typeof currentLegacy.close === 'function') {
+                            await currentLegacy.close();
+                            return;
+                        }
+                    }
+                }
+
+                if (typeof window.close === 'function') {
+                    window.close();
+                }
+            } catch (e) {
+                console.error('Error closing window:', e);
+                if (typeof window.close === 'function') {
+                    window.close();
+                }
+            }
+        }
+
+        // Button click handler
+        document.getElementById('continue-btn').addEventListener('click', closeSplash);
+
+        // Allow Enter to close
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                closeSplash();
+            }
+        });
+    </script>
+</body>
+</html>

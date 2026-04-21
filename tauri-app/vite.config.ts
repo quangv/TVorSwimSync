@@ -15,6 +15,8 @@ export default defineConfig(async () => ({
         calibrate: resolve(__dirname, "calibrate.html"),
         "test-marker": resolve(__dirname, "test-marker.html"),
         help: resolve(__dirname, "help.html"),
+        splash: resolve(__dirname, "splash.html"),
+        about: resolve(__dirname, "about.html"),
       },
     },
   },
@@ -34,7 +36,7 @@ export default defineConfig(async () => ({
           host,
           port: 1421,
         }
-      : undefined,
+      : false,
     watch: {
       // 3. tell Vite to ignore watching `src-tauri`
       ignored: ["**/src-tauri/**"],

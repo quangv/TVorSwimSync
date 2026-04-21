@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build"
+    "tauri:build": "tauri build",
+    "app:prod": "open -a Terminal src-tauri/target/release/bundle/macos/TVorSwimSync.app/Contents/MacOS/tauri-app"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.10.1",

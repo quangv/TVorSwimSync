@@ -63,6 +63,12 @@ fn click_target_file_path() -> std::path::PathBuf {
     path
 }
 
+fn splash_disabled_file_path() -> std::path::PathBuf {
+    let mut path = dirs::home_dir().unwrap_or_default();
+    path.push(".tvorswim_splash_disabled");
+    path
+}
+
 /// Get the front window title for an app using Core Graphics.
 /// Iterates on-screen windows (front-to-back order) and returns the first
 /// title belonging to `owner_name`.
@@ -156,6 +162,37 @@ fn check_accessibility_permission_cmd(prompt: bool) -> bool {
 #[tauri::command]
 fn get_app_version() -> String {
     env!("CARGO_PKG_VERSION").to_string()
+}
+
+#[tauri::command]
+fn disable_splash_screen() -> bool {
+    let path = splash_disabled_file_path();
+    fs::write(&path, "1").is_ok()
+}
+
+#[tauri::command]
+fn is_splash_enabled() -> bool {
+    let path = splash_disabled_file_path();
+    !path.exists()
+}
+
+#[tauri::command]
+fn reset_splash_screen() -> bool {
+    let path = splash_disabled_file_path();
+    if path.exists() {
+        fs::remove_file(&path).is_ok()
+    } else {
+        true
+    }
+}
+
+#[tauri::command]
+fn close_splash_window(app: tauri::AppHandle) -> bool {
+    if let Some(window) = app.get_webview_window("splash") {
+        window.close().is_ok()
+    } else {
+        true
+    }
 }
 
 fn get_tradingview_title() -> Option<String> {
@@ -425,6 +462,23 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
+            // Show splash screen on startup if not disabled
+            let should_show_splash = is_splash_enabled();
+            if should_show_splash {
+                let _ = WebviewWindowBuilder::new(
+                    app,
+                    "splash",
+                    WebviewUrl::App("splash.html".into()),
+                )
+                .title("TVorSwimSync")
+                .inner_size(560.0, 440.0)
+                .resizable(false)
+                .decorations(false)
+                .always_on_top(true)
+                .transparent(false)
+                .build();
+            }
+
             let sync_label = if cfg!(debug_assertions) {
                 "✓ Auto-Sync Enabled (Beta)"
             } else {
@@ -453,6 +507,9 @@ pub fn run() {
             let help_item = MenuItemBuilder::new("Sync Positioning Help")
                 .id("show_help")
                 .build(app)?;
+            let reset_splash_item = MenuItemBuilder::new("Show Splash Screen on Next Launch")
+                .id("reset_splash")
+                .build(app)?;
 
             let app_submenu = SubmenuBuilder::new(app, "TVorSwimSync")
                 .item(&sync_item)
@@ -468,6 +525,8 @@ pub fn run() {
             let help_submenu = SubmenuBuilder::new(app, "Help")
                 .item(&about_item)
                 .item(&help_item)
+                .separator()
+                .item(&reset_splash_item)
                 .build()?;
 
             let menu = MenuBuilder::new(app)
@@ -573,6 +632,8 @@ pub fn run() {
                         .resizable(false)
                         .build();
                     }
+                } else if event.id().as_ref() == "reset_splash" {
+                    let _ = reset_splash_screen();
                 }
             });
 
@@ -597,7 +658,11 @@ pub fn run() {
             test_click_target,
             check_accessibility_permission_cmd,
             deactivate_app_cmd,
-            get_app_version
+            get_app_version,
+            disable_splash_screen,
+            is_splash_enabled,
+            reset_splash_screen,
+            close_splash_window
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

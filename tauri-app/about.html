@@ -11,52 +11,82 @@
         }
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background: #f5f5f5;
-            padding: 24px;
-            line-height: 1.6;
-            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
         }
         .container {
-            max-width: 380px;
-            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            padding: 48px 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 480px;
+            width: 100%;
         }
         h1 {
-            font-size: 24px;
-            margin-bottom: 8px;
+            font-size: 36px;
+            margin-bottom: 16px;
+            color: #333;
+            font-weight: 600;
         }
         .version {
-            font-size: 12px;
-            color: #666;
-            margin-bottom: 20px;
+            font-size: 14px;
+            color: #999;
+            margin-bottom: 32px;
+            letter-spacing: 0.5px;
         }
         .section {
-            margin-bottom: 20px;
+            margin-bottom: 24px;
         }
         .section-title {
             font-size: 12px;
             font-weight: 600;
-            color: #666;
+            color: #999;
             text-transform: uppercase;
-            margin-bottom: 8px;
+            margin-bottom: 10px;
+            letter-spacing: 0.5px;
         }
         p {
-            font-size: 13px;
+            font-size: 14px;
             margin-bottom: 12px;
+            line-height: 1.6;
+            color: #555;
         }
         .warning {
             background: #fff3cd;
-            border-left: 3px solid #ffc107;
+            border-left: 4px solid #ffc107;
             padding: 12px;
-            border-radius: 4px;
-            font-size: 12px;
-            margin: 16px 0;
+            border-radius: 6px;
+            margin-bottom: 24px;
         }
-        a {
-            color: #0066cc;
-            text-decoration: none;
+        .warning p {
+            margin: 0;
+            font-size: 13px;
+            color: #856404;
         }
-        a:hover {
-            text-decoration: underline;
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 32px;
+            border-radius: 8px;
+            font-size: 15px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s;
+            margin-top: 20px;
+        }
+        button:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        button:active {
+            opacity: 0.8;
+            transform: translateY(0);
         }
     </style>
 </head>
@@ -90,19 +120,18 @@
         </div>
     </div>
 
-    <script type="module">
-        import { invoke } from '@tauri-apps/api/core';
-        
-        async function loadVersion() {
+    <script>
+        // Try to load version dynamically, but don't block page display
+        (async function() {
             try {
-                const version = await invoke('get_app_version');
-                document.getElementById('version').textContent = version;
+                if (window.__TAURI__ && window.__TAURI__.core) {
+                    const version = await window.__TAURI__.core.invoke('get_app_version');
+                    document.getElementById('version').textContent = version;
+                }
             } catch (e) {
-                console.error('Failed to load version:', e);
-                document.getElementById('version').textContent = 'unknown';
+                // Silently fail - leave "loading..." as fallback
             }
-        }
-        loadVersion();
+        })();
     </script>
 </body>
 </html>
