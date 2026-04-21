@@ -63,7 +63,7 @@
 <body>
     <div class="container">
         <h1>TVorSwimSync</h1>
-        <div class="version">Version 0.1.0</div>
+        <div class="version" id="version-text">Version <span id="version">loading...</span></div>
 
         <div class="section">
             <div class="section-title">About</div>
@@ -89,5 +89,20 @@
             3. Change symbols in TradingView to sync automatically</p>
         </div>
     </div>
+
+    <script type="module">
+        import { invoke } from '@tauri-apps/api/core';
+        
+        async function loadVersion() {
+            try {
+                const version = await invoke('get_app_version');
+                document.getElementById('version').textContent = version;
+            } catch (e) {
+                console.error('Failed to load version:', e);
+                document.getElementById('version').textContent = 'unknown';
+            }
+        }
+        loadVersion();
+    </script>
 </body>
 </html>

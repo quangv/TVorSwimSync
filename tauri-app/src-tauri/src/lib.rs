@@ -153,6 +153,11 @@ fn check_accessibility_permission_cmd(prompt: bool) -> bool {
     check_accessibility_permission(prompt)
 }
 
+#[tauri::command]
+fn get_app_version() -> String {
+    env!("CARGO_PKG_VERSION").to_string()
+}
+
 fn get_tradingview_title() -> Option<String> {
     get_window_title_for_app("TradingView")
 }
@@ -591,7 +596,8 @@ pub fn run() {
             close_window,
             test_click_target,
             check_accessibility_permission_cmd,
-            deactivate_app_cmd
+            deactivate_app_cmd,
+            get_app_version
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

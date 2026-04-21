@@ -8,6 +8,10 @@ The app polls every **1 second** using the macOS **Core Graphics API** (`CGWindo
 
 **Screen Recording permission** is required on macOS to read window titles of other apps. Grant it to the app (or the terminal running it in dev mode) via **System Settings → Privacy & Security → Screen Recording**.
 
+## Versioning
+
+The app version is defined in [Cargo.toml](src-tauri/Cargo.toml) under `[package] version`. This single source of truth is automatically used throughout the app (About window, CLI tools, etc.) via the `get_app_version` Tauri command that reads `env!("CARGO_PKG_VERSION")` at build time.
+
 ## Dev Setup
 
 ### Prerequisites
