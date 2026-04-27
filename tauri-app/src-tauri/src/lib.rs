@@ -17,6 +17,7 @@ use tauri::{WebviewWindowBuilder, WebviewUrl};
 use std::sync::atomic::{AtomicBool, Ordering};
 
 static SYNC_ENABLED: AtomicBool = AtomicBool::new(cfg!(debug_assertions));
+static WINDOW_HIDDEN: AtomicBool = AtomicBool::new(false);
 
 /// Deactivate our app so we don't steal focus from other apps.
 fn deactivate_app() {
@@ -510,6 +511,9 @@ pub fn run() {
             let reset_splash_item = MenuItemBuilder::new("Show Splash Screen on Next Launch")
                 .id("reset_splash")
                 .build(app)?;
+            let hide_item = MenuItemBuilder::new("Hide")
+                .id("toggle_hide")
+                .build(app)?;
 
             let app_submenu = SubmenuBuilder::new(app, "TVorSwimSync")
                 .item(&sync_item)
@@ -518,6 +522,8 @@ pub fn run() {
                 .item(&test_sync_item)
                 .separator()
                 .item(&disclaimer)
+                .separator()
+                .item(&hide_item)
                 .separator()
                 .quit()
                 .build()?;
@@ -634,6 +640,19 @@ pub fn run() {
                     }
                 } else if event.id().as_ref() == "reset_splash" {
                     let _ = reset_splash_screen();
+                } else if event.id().as_ref() == "toggle_hide" {
+                    let was_hidden = WINDOW_HIDDEN.load(Ordering::Relaxed);
+                    if let Some(win) = app_handle.get_webview_window("main") {
+                        if was_hidden {
+                            let _ = win.show();
+                            WINDOW_HIDDEN.store(false, Ordering::Relaxed);
+                            let _ = hide_item.set_text("Hide");
+                        } else {
+                            let _ = win.hide();
+                            WINDOW_HIDDEN.store(true, Ordering::Relaxed);
+                            let _ = hide_item.set_text("Show");
+                        }
+                    }
                 }
             });
 
