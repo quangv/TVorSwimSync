@@ -480,12 +480,19 @@ pub fn run() {
                 .build();
             }
 
-            let sync_label = if cfg!(debug_assertions) {
-                "✓ Auto-Sync Enabled (Beta)"
+            // Use actual state to determine initial labels (avoids debug/release mismatch)
+            let initially_disarmed = WINDOW_HIDDEN.load(Ordering::Relaxed) && !SYNC_ENABLED.load(Ordering::Relaxed);
+            let arm_item = MenuItemBuilder::new(if initially_disarmed {
+                "Arm - Show && Enable auto-sync"
             } else {
-                "Enable Auto-Sync (Beta)"
-            };
-            let sync_item = MenuItemBuilder::new(sync_label)
+                "Disarm - Hide && Disable auto-sync"
+            })
+                .id("toggle_arm")
+                .build(app)?;
+            let show_hide_item = MenuItemBuilder::new(if WINDOW_HIDDEN.load(Ordering::Relaxed) { "Show Window" } else { "Hide Window" })
+                .id("toggle_show_hide")
+                .build(app)?;
+            let sync_toggle_item = MenuItemBuilder::new(if SYNC_ENABLED.load(Ordering::Relaxed) { "Disable Auto-Sync" } else { "Enable Auto-Sync" })
                 .id("toggle_sync")
                 .build(app)?;
             let setup_item = MenuItemBuilder::new("Setup Auto-Sync Target...")
@@ -511,19 +518,17 @@ pub fn run() {
             let reset_splash_item = MenuItemBuilder::new("Show Splash Screen on Next Launch")
                 .id("reset_splash")
                 .build(app)?;
-            let hide_item = MenuItemBuilder::new("Hide")
-                .id("toggle_hide")
-                .build(app)?;
 
             let app_submenu = SubmenuBuilder::new(app, "TVorSwimSync")
-                .item(&sync_item)
+                .item(&arm_item)
+                .item(&show_hide_item)
+                .item(&sync_toggle_item)
+                .separator()
                 .item(&setup_item)
                 .item(&test_item)
                 .item(&test_sync_item)
                 .separator()
                 .item(&disclaimer)
-                .separator()
-                .item(&hide_item)
                 .separator()
                 .quit()
                 .build()?;
@@ -541,16 +546,62 @@ pub fn run() {
                 .build()?;
             app.set_menu(menu)?;
 
+            // "Arm" only when BOTH hidden and sync disabled; everything else shows "Disarm"
+            let is_fully_disarmed = || {
+                WINDOW_HIDDEN.load(Ordering::Relaxed) && !SYNC_ENABLED.load(Ordering::Relaxed)
+            };
+
             app.on_menu_event(move |app_handle, event| {
-                if event.id().as_ref() == "toggle_sync" {
-                    let was = SYNC_ENABLED.load(Ordering::Relaxed);
-                    SYNC_ENABLED.store(!was, Ordering::Relaxed);
-                    let label = if !was {
-                        "✓ Auto-Sync Enabled (Beta)"
+                if event.id().as_ref() == "toggle_arm" {
+                    if is_fully_disarmed() {
+                        // Arm: show AND enable sync
+                        SYNC_ENABLED.store(true, Ordering::Relaxed);
+                        WINDOW_HIDDEN.store(false, Ordering::Relaxed);
+                        if let Some(win) = app_handle.get_webview_window("main") {
+                            let _ = win.show();
+                        }
+                        let _ = arm_item.set_text("Disarm - Hide && Disable auto-sync");
+                        let _ = show_hide_item.set_text("Hide Window");
+                        let _ = sync_toggle_item.set_text("Disable Auto-Sync");
                     } else {
-                        "Enable Auto-Sync (Beta)"
-                    };
-                    let _ = sync_item.set_text(label);
+                        // Disarm: always hide AND disable sync
+                        SYNC_ENABLED.store(false, Ordering::Relaxed);
+                        WINDOW_HIDDEN.store(true, Ordering::Relaxed);
+                        if let Some(win) = app_handle.get_webview_window("main") {
+                            let _ = win.hide();
+                        }
+                        let _ = arm_item.set_text("Arm - Show && Enable auto-sync");
+                        let _ = show_hide_item.set_text("Show Window");
+                        let _ = sync_toggle_item.set_text("Enable Auto-Sync");
+                    }
+                } else if event.id().as_ref() == "toggle_show_hide" {
+                    let hidden = WINDOW_HIDDEN.load(Ordering::Relaxed);
+                    if let Some(win) = app_handle.get_webview_window("main") {
+                        if hidden {
+                            let _ = win.show();
+                            WINDOW_HIDDEN.store(false, Ordering::Relaxed);
+                            let _ = show_hide_item.set_text("Hide Window");
+                        } else {
+                            let _ = win.hide();
+                            WINDOW_HIDDEN.store(true, Ordering::Relaxed);
+                            let _ = show_hide_item.set_text("Show Window");
+                        }
+                    }
+                    let _ = arm_item.set_text(if is_fully_disarmed() {
+                        "Arm - Show && Enable auto-sync"
+                    } else {
+                        "Disarm - Hide && Disable auto-sync"
+                    });
+                } else if event.id().as_ref() == "toggle_sync" {
+                    let was_enabled = SYNC_ENABLED.load(Ordering::Relaxed);
+                    let now_enabled = !was_enabled;
+                    SYNC_ENABLED.store(now_enabled, Ordering::Relaxed);
+                    let _ = sync_toggle_item.set_text(if now_enabled { "Disable Auto-Sync" } else { "Enable Auto-Sync" });
+                    let _ = arm_item.set_text(if is_fully_disarmed() {
+                        "Arm - Show && Enable auto-sync"
+                    } else {
+                        "Disarm - Hide && Disable auto-sync"
+                    });
                 } else if event.id().as_ref() == "setup_sync" {
                     // Close test marker if it's open
                     if let Some(marker) = app_handle.get_webview_window("test_marker") {
@@ -640,19 +691,6 @@ pub fn run() {
                     }
                 } else if event.id().as_ref() == "reset_splash" {
                     let _ = reset_splash_screen();
-                } else if event.id().as_ref() == "toggle_hide" {
-                    let was_hidden = WINDOW_HIDDEN.load(Ordering::Relaxed);
-                    if let Some(win) = app_handle.get_webview_window("main") {
-                        if was_hidden {
-                            let _ = win.show();
-                            WINDOW_HIDDEN.store(false, Ordering::Relaxed);
-                            let _ = hide_item.set_text("Hide");
-                        } else {
-                            let _ = win.hide();
-                            WINDOW_HIDDEN.store(true, Ordering::Relaxed);
-                            let _ = hide_item.set_text("Show");
-                        }
-                    }
                 }
             });
 
