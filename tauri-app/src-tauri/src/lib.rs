@@ -563,6 +563,18 @@ pub fn run() {
                         let _ = arm_item.set_text("Disarm - Hide && Disable auto-sync");
                         let _ = show_hide_item.set_text("Hide Window");
                         let _ = sync_toggle_item.set_text("Disable Auto-Sync");
+                        // Sync once immediately on arm
+                        if let Some(tv_title) = get_tradingview_title() {
+                            if let Some(symbol) = extract_symbol(&tv_title, "tradingview") {
+                                std::thread::spawn(move || {
+                                    if let Some(pos) = load_click_target() {
+                                        sync_to_tos(symbol, pos.x, pos.y);
+                                        std::thread::sleep(std::time::Duration::from_millis(200));
+                                        deactivate_app();
+                                    }
+                                });
+                            }
+                        }
                     } else {
                         // Disarm: always hide AND disable sync
                         SYNC_ENABLED.store(false, Ordering::Relaxed);
