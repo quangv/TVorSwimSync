@@ -25,6 +25,7 @@ const permA11y = document.getElementById("perm-a11y")!;
 let hasScreenPermission = true;
 let hasA11yPermission = true;
 let lastTvSymbol: string | null = null;
+let lastSyncEnabled = false;
 let syncing = false;
 
 async function checkPermissions() {
@@ -125,13 +126,14 @@ async function pollSymbols() {
       symbolEl.textContent = "--";
     }
 
-    // Auto-sync: when TV symbol changes, type it into thinkorswim input
+    // Auto-sync: when TV symbol changes (or sync just got armed), type it into thinkorswim input
     const syncEnabled = await invoke<boolean>("get_sync_enabled");
+    const justArmed = syncEnabled && !lastSyncEnabled;
+    lastSyncEnabled = syncEnabled;
     if (
       syncEnabled &&
       state.tradingview_symbol &&
-      state.tradingview_symbol !== lastTvSymbol &&
-      lastTvSymbol !== null &&
+      (justArmed || (state.tradingview_symbol !== lastTvSymbol && lastTvSymbol !== null)) &&
       !syncing
     ) {
       syncing = true;
