@@ -154,9 +154,13 @@ async function pollSymbols() {
     }
     lastTvSymbol = state.tradingview_symbol;
 
-    emojiEl.textContent = state.matched ? "🌊" : "🛑";
-
-    const { mode } = await invoke<{ mode: string }>("load_mappings");
+    const { mode } = await invoke<{ mode: string; long_mappings: string; short_mappings: string }>("load_mappings");
+    let matched = state.matched;
+    if (mode !== "off" && state.tradingview_symbol && state.thinkorswim_symbol) {
+      const mappedSymbol = await invoke<string>("apply_symbol_mapping", { symbol: state.tradingview_symbol });
+      matched = mappedSymbol.toUpperCase() === state.thinkorswim_symbol.toUpperCase();
+    }
+    emojiEl.textContent = matched ? "🌊" : "🛑";
     if (mode === "long") {
       mapModeEl.textContent = "▲";
       mapModeEl.style.color = "#22c55e";
