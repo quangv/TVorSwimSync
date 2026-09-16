@@ -33,9 +33,10 @@ Built with [Tauri v2](https://tauri.app/) — a Rust + WebView desktop framework
 
 1. Run `npm run tauri:build` from the `tauri-app` directory
 2. Drag the built app to your Applications folder (choose **Replace** if upgrading)
-3. On first launch, grant two permissions when prompted:
+3. Grant two permissions:
    - **Screen Recording** — to read window titles from TradingView and thinkorswim
    - **Accessibility** — to type symbols into thinkorswim via auto-sync
+   - If upgrading: remove TVorSwimSync from both lists in **System Settings → Privacy & Security**, then re-add it — you can click the shortcut directly from the app icon to open the right settings page
 
 ## Development
 
