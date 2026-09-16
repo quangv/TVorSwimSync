@@ -138,7 +138,8 @@ async function pollSymbols() {
     ) {
       syncing = true;
       try {
-        await invoke("auto_sync", { symbol: state.tradingview_symbol });
+        const symbolToSync = await invoke<string>("apply_symbol_mapping", { symbol: state.tradingview_symbol });
+        await invoke("auto_sync", { symbol: symbolToSync });
       } catch {
         try {
           await getCurrentWindow().show();

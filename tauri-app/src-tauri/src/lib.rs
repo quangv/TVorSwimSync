@@ -70,6 +70,42 @@ fn splash_disabled_file_path() -> std::path::PathBuf {
     path
 }
 
+fn mappings_file_path() -> std::path::PathBuf {
+    let mut path = dirs::home_dir().unwrap_or_default();
+    path.push(".tvorswim_mappings.json");
+    path
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct SymbolMappings {
+    mode: String,
+    long_mappings: String,
+    short_mappings: String,
+}
+
+impl Default for SymbolMappings {
+    fn default() -> Self {
+        Self {
+            mode: "off".into(),
+            long_mappings: "AAPL:AAPU\nCRWD:CRWC\nGOOGL:GOOW\nINTC:INTW\nORCL:ORCU\nMU:MUU\nNVDA:NVDL\nPLTR:PTIR\nSPCX:SPCH\nTSLA:TSLR".into(),
+            short_mappings: String::new(),
+        }
+    }
+}
+
+fn parse_mapping(mappings_str: &str, symbol: &str) -> Option<String> {
+    for line in mappings_str.lines() {
+        let parts: Vec<&str> = line.trim().splitn(2, ':').collect();
+        if parts.len() == 2 && parts[0].trim().eq_ignore_ascii_case(symbol) {
+            let mapped = parts[1].trim().to_string();
+            if !mapped.is_empty() {
+                return Some(mapped);
+            }
+        }
+    }
+    None
+}
+
 /// Get the front window title for an app using Core Graphics.
 /// Iterates on-screen windows (front-to-back order) and returns the first
 /// title belonging to `owner_name`.
@@ -185,6 +221,31 @@ fn reset_splash_screen() -> bool {
     } else {
         true
     }
+}
+
+#[tauri::command]
+fn save_mappings(mappings: SymbolMappings) -> Result<(), String> {
+    let json = serde_json::to_string(&mappings).map_err(|e| e.to_string())?;
+    fs::write(mappings_file_path(), json).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn load_mappings() -> SymbolMappings {
+    fs::read_to_string(mappings_file_path())
+        .ok()
+        .and_then(|data| serde_json::from_str(&data).ok())
+        .unwrap_or_default()
+}
+
+#[tauri::command]
+fn apply_symbol_mapping(symbol: String) -> String {
+    let mappings = load_mappings();
+    let mapped = match mappings.mode.as_str() {
+        "long" => parse_mapping(&mappings.long_mappings, &symbol),
+        "short" => parse_mapping(&mappings.short_mappings, &symbol),
+        _ => None,
+    };
+    mapped.unwrap_or(symbol)
 }
 
 #[tauri::command]
@@ -496,6 +557,9 @@ pub fn run() {
             let sync_toggle_item = MenuItemBuilder::new(if SYNC_ENABLED.load(Ordering::Relaxed) { "Disable Auto-Sync" } else { "Enable Auto-Sync" })
                 .id("toggle_sync")
                 .build(app)?;
+            let mappings_item = MenuItemBuilder::new("Symbol Mappings...")
+                .id("symbol_mappings")
+                .build(app)?;
             let setup_item = MenuItemBuilder::new("Setup Auto-Sync Target...")
                 .id("setup_sync")
                 .build(app)?;
@@ -525,6 +589,7 @@ pub fn run() {
                 .item(&show_hide_item)
                 .item(&sync_toggle_item)
                 .separator()
+                .item(&mappings_item)
                 .item(&setup_item)
                 .item(&test_item)
                 .item(&test_sync_item)
@@ -690,6 +755,20 @@ pub fn run() {
                         .resizable(false)
                         .build();
                     }
+                } else if event.id().as_ref() == "symbol_mappings" {
+                    if let Some(existing) = app_handle.get_webview_window("mappings") {
+                        let _ = existing.set_focus();
+                    } else {
+                        let _ = WebviewWindowBuilder::new(
+                            app_handle,
+                            "mappings",
+                            WebviewUrl::App("mappings.html".into()),
+                        )
+                        .title("Symbol Mappings")
+                        .inner_size(480.0, 540.0)
+                        .resizable(true)
+                        .build();
+                    }
                 } else if event.id().as_ref() == "reset_splash" {
                     let _ = reset_splash_screen();
                 }
@@ -720,7 +799,10 @@ pub fn run() {
             disable_splash_screen,
             is_splash_enabled,
             reset_splash_screen,
-            close_splash_window
+            close_splash_window,
+            save_mappings,
+            load_mappings,
+            apply_symbol_mapping
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
