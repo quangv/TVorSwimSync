@@ -44,7 +44,7 @@ Run `npm run tauri:dev` to launch the app in dev mode with hot reload.
 ## Creating a Release
 
 1. Bump the version in `tauri-app/src-tauri/tauri.conf.json`
-2. Add a new entry at the top of `tauri-app/release-notes.html` (copy the previous block, update version/date/bullet points, move `current` CSS class and badge to the new block)
+2. Run `git log v<prev>..HEAD --oneline` to see what changed, then add a new entry at the top of `tauri-app/release-notes.html` with those changes as bullet points (copy the previous block, update version/date/bullets, move `current` CSS class and badge to the new block)
 3. Build: `cd tauri-app && npm run tauri build`
 4. The DMG is output to `tauri-app/src-tauri/target/release/bundle/dmg/`
 5. Commit: `git commit -am "v<version> — <one-line summary>"`
