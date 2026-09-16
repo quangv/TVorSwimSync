@@ -240,15 +240,27 @@ fn load_mappings() -> SymbolMappings {
 #[tauri::command]
 fn apply_symbol_mapping(symbol: String) -> String {
     let mappings = load_mappings();
-    eprintln!("[mapping] mode={} symbol={}", mappings.mode, symbol);
     let mapped = match mappings.mode.as_str() {
         "long" => parse_mapping(&mappings.long_mappings, &symbol),
         "short" => parse_mapping(&mappings.short_mappings, &symbol),
         _ => None,
     };
-    let result = mapped.unwrap_or(symbol);
-    eprintln!("[mapping] result={}", result);
-    result
+    mapped.unwrap_or(symbol)
+}
+
+fn force_sync_now() {
+    if let Some(pos) = load_click_target() {
+        if let Some(title) = get_tradingview_title() {
+            if let Some(symbol) = extract_symbol(&title, "tradingview") {
+                let mapped = apply_symbol_mapping(symbol);
+                std::thread::spawn(move || {
+                    sync_to_tos(mapped, pos.x, pos.y);
+                    std::thread::sleep(std::time::Duration::from_millis(200));
+                    deactivate_app();
+                });
+            }
+        }
+    }
 }
 
 #[tauri::command]
@@ -560,8 +572,28 @@ pub fn run() {
             let sync_toggle_item = MenuItemBuilder::new(if SYNC_ENABLED.load(Ordering::Relaxed) { "Disable Auto-Sync" } else { "Enable Auto-Sync" })
                 .id("toggle_sync")
                 .build(app)?;
-            let mappings_item = MenuItemBuilder::new("Symbol Mappings...")
-                .id("symbol_mappings")
+            let initial_mode = load_mappings().mode;
+            let map_off_item = MenuItemBuilder::new(if initial_mode == "off" { "✓ Off" } else { "  Off" })
+                .id("map_off")
+                .build(app)?;
+            let map_long_item = MenuItemBuilder::new(if initial_mode == "long" { "✓ Long" } else { "  Long" })
+                .id("map_long")
+                .build(app)?;
+            let map_short_item = MenuItemBuilder::new(if initial_mode == "short" { "✓ Short" } else { "  Short" })
+                .id("map_short")
+                .build(app)?;
+            let edit_mappings_item = MenuItemBuilder::new("Edit Mappings...")
+                .id("edit_mappings")
+                .build(app)?;
+            let mappings_submenu = SubmenuBuilder::new(app, "Mappings")
+                .item(&map_off_item)
+                .item(&map_long_item)
+                .item(&map_short_item)
+                .separator()
+                .item(&edit_mappings_item)
+                .build()?;
+            let force_sync_item = MenuItemBuilder::new("Force Sync")
+                .id("force_sync")
                 .build(app)?;
             let setup_item = MenuItemBuilder::new("Setup Auto-Sync Target...")
                 .id("setup_sync")
@@ -592,7 +624,7 @@ pub fn run() {
                 .item(&show_hide_item)
                 .item(&sync_toggle_item)
                 .separator()
-                .item(&mappings_item)
+                .item(&force_sync_item)
                 .item(&setup_item)
                 .item(&test_item)
                 .item(&test_sync_item)
@@ -611,6 +643,7 @@ pub fn run() {
 
             let menu = MenuBuilder::new(app)
                 .item(&app_submenu)
+                .item(&mappings_submenu)
                 .item(&help_submenu)
                 .build()?;
             app.set_menu(menu)?;
@@ -758,7 +791,24 @@ pub fn run() {
                         .resizable(false)
                         .build();
                     }
-                } else if event.id().as_ref() == "symbol_mappings" {
+                } else if event.id().as_ref() == "force_sync" {
+                    force_sync_now();
+                } else if matches!(event.id().as_ref(), "map_off" | "map_long" | "map_short") {
+                    let new_mode = match event.id().as_ref() {
+                        "map_long" => "long",
+                        "map_short" => "short",
+                        _ => "off",
+                    };
+                    let mut m = load_mappings();
+                    m.mode = new_mode.to_string();
+                    let _ = save_mappings(m);
+                    let _ = map_off_item.set_text(if new_mode == "off" { "✓ Off" } else { "  Off" });
+                    let _ = map_long_item.set_text(if new_mode == "long" { "✓ Long" } else { "  Long" });
+                    let _ = map_short_item.set_text(if new_mode == "short" { "✓ Short" } else { "  Short" });
+                    if new_mode != "off" {
+                        force_sync_now();
+                    }
+                } else if event.id().as_ref() == "edit_mappings" {
                     if let Some(existing) = app_handle.get_webview_window("mappings") {
                         let _ = existing.set_focus();
                     } else {
