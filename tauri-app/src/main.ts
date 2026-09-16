@@ -156,8 +156,17 @@ async function pollSymbols() {
 
     emojiEl.textContent = state.matched ? "🌊" : "🛑";
 
-    const mode = await invoke<{ mode: string }>("load_mappings");
-    mapModeEl.textContent = mode.mode === "long" ? "⬆️" : mode.mode === "short" ? "⬇️" : "";
+    const { mode } = await invoke<{ mode: string }>("load_mappings");
+    if (mode === "long") {
+      mapModeEl.textContent = "▲";
+      mapModeEl.style.color = "#22c55e";
+    } else if (mode === "short") {
+      mapModeEl.textContent = "▼";
+      mapModeEl.style.color = "#ef4444";
+    } else {
+      mapModeEl.textContent = "⏺";
+      mapModeEl.style.color = "#FECB09";
+    }
 
     // Wave crashing over symbol when synced; centered on stop sign when unsynced
     if (state.matched) {
@@ -169,6 +178,13 @@ async function pollSymbols() {
     // TradingView/thinkorswim may not be running
   }
 }
+
+mapModeEl.addEventListener("click", async () => {
+  const { mode, long_mappings, short_mappings } = await invoke<{ mode: string; long_mappings: string; short_mappings: string }>("load_mappings");
+  const next = mode === "off" ? "long" : mode === "long" ? "short" : "off";
+  await invoke("save_mappings", { mappings: { mode: next, long_mappings, short_mappings } });
+  await invoke("force_sync_cmd");
+});
 
 // Initialize
 restorePosition();

@@ -248,6 +248,11 @@ fn apply_symbol_mapping(symbol: String) -> String {
     mapped.unwrap_or(symbol)
 }
 
+#[tauri::command]
+fn force_sync_cmd() {
+    force_sync_now();
+}
+
 fn force_sync_now() {
     if let Some(pos) = load_click_target() {
         if let Some(title) = get_tradingview_title() {
@@ -855,7 +860,8 @@ pub fn run() {
             close_splash_window,
             save_mappings,
             load_mappings,
-            apply_symbol_mapping
+            apply_symbol_mapping,
+            force_sync_cmd
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
