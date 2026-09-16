@@ -29,6 +29,18 @@ Built with [Tauri v2](https://tauri.app/) — a Rust + WebView desktop framework
 | Backend | Rust 2021 |
 | macOS APIs | Core Graphics (`CGWindowListCopyWindowInfo`), AppleScript via `osascript` |
 
+## Install
+
+1. Run `npm run tauri:build` from the `tauri-app` directory
+2. Drag the built app to your Applications folder (choose **Replace** if upgrading)
+3. On first launch, grant two permissions when prompted:
+   - **Screen Recording** — to read window titles from TradingView and thinkorswim
+   - **Accessibility** — to type symbols into thinkorswim via auto-sync
+
+## Development
+
+Run `npm run tauri:dev` to launch the app in dev mode with hot reload.
+
 ## Requirements
 
 - macOS (Apple Silicon or Intel)
