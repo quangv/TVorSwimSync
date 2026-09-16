@@ -138,9 +138,13 @@ async function pollSymbols() {
     ) {
       syncing = true;
       try {
+        console.log("[sync] TV symbol:", state.tradingview_symbol);
         const symbolToSync = await invoke<string>("apply_symbol_mapping", { symbol: state.tradingview_symbol });
+        console.log("[sync] mapped symbol:", symbolToSync);
         await invoke("auto_sync", { symbol: symbolToSync });
-      } catch {
+        console.log("[sync] auto_sync called with:", symbolToSync);
+      } catch (e) {
+        console.error("[sync] error:", e);
         try {
           await getCurrentWindow().show();
         } catch {}

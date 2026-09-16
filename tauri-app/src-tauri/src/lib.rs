@@ -240,12 +240,15 @@ fn load_mappings() -> SymbolMappings {
 #[tauri::command]
 fn apply_symbol_mapping(symbol: String) -> String {
     let mappings = load_mappings();
+    eprintln!("[mapping] mode={} symbol={}", mappings.mode, symbol);
     let mapped = match mappings.mode.as_str() {
         "long" => parse_mapping(&mappings.long_mappings, &symbol),
         "short" => parse_mapping(&mappings.short_mappings, &symbol),
         _ => None,
     };
-    mapped.unwrap_or(symbol)
+    let result = mapped.unwrap_or(symbol);
+    eprintln!("[mapping] result={}", result);
+    result
 }
 
 #[tauri::command]
