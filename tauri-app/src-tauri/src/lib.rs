@@ -620,6 +620,9 @@ pub fn run() {
             let help_item = MenuItemBuilder::new("Sync Positioning Help")
                 .id("show_help")
                 .build(app)?;
+            let release_notes_item = MenuItemBuilder::new("Release Notes")
+                .id("release_notes")
+                .build(app)?;
             let reset_splash_item = MenuItemBuilder::new("Show Splash Screen on Next Launch")
                 .id("reset_splash")
                 .build(app)?;
@@ -642,6 +645,7 @@ pub fn run() {
             let help_submenu = SubmenuBuilder::new(app, "Help")
                 .item(&about_item)
                 .item(&help_item)
+                .item(&release_notes_item)
                 .separator()
                 .item(&reset_splash_item)
                 .build()?;
@@ -824,6 +828,20 @@ pub fn run() {
                         )
                         .title("Symbol Mappings")
                         .inner_size(480.0, 540.0)
+                        .resizable(true)
+                        .build();
+                    }
+                } else if event.id().as_ref() == "release_notes" {
+                    if let Some(existing) = app_handle.get_webview_window("release_notes") {
+                        let _ = existing.set_focus();
+                    } else {
+                        let _ = WebviewWindowBuilder::new(
+                            app_handle,
+                            "release_notes",
+                            WebviewUrl::App("release-notes.html".into()),
+                        )
+                        .title("Release Notes")
+                        .inner_size(480.0, 560.0)
                         .resizable(true)
                         .build();
                     }

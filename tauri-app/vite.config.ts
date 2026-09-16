@@ -18,6 +18,7 @@ export default defineConfig(async () => ({
         splash: resolve(__dirname, "splash.html"),
         about: resolve(__dirname, "about.html"),
         mappings: resolve(__dirname, "mappings.html"),
+        "release-notes": resolve(__dirname, "release-notes.html"),
       },
     },
   },
