@@ -483,7 +483,7 @@ fn sync_to_tos(symbol: String, click_x: f64, click_y: f64) {
         .filter(|c| c.is_alphanumeric() || *c == '.' || *c == '-' || *c == '!')
         .collect();
     let type_script = format!(
-        "tell application \"System Events\"\nkeystroke \"{}\"\nkey code 36\nend tell",
+        "tell application \"System Events\"\nkeystroke \"{}\"\nkey code 48\nend tell",
         safe_symbol
     );
     let _ = std::process::Command::new("osascript")
