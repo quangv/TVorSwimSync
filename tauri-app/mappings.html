@@ -210,6 +210,18 @@
             }
         });
 
+        document.querySelectorAll("textarea").forEach(ta => {
+            ta.addEventListener("keydown", (e) => {
+                if (e.metaKey || e.ctrlKey) {
+                    if (e.key === "a") { e.preventDefault(); ta.select(); }
+                    else if (e.key === "c") { document.execCommand("copy"); }
+                    else if (e.key === "v") { document.execCommand("paste"); }
+                    else if (e.key === "x") { document.execCommand("cut"); }
+                    else if (e.key === "z") { e.shiftKey ? document.execCommand("redo") : document.execCommand("undo"); }
+                }
+            });
+        });
+
         load();
     </script>
 </body>
