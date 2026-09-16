@@ -173,7 +173,7 @@ async function pollSymbols() {
     }
 
     // Wave crashing over symbol when synced; centered on stop sign when unsynced
-    if (state.matched) {
+    if (matched) {
       symbolEl.style.transform = "translateY(22px)";
     } else {
       symbolEl.style.transform = "";
