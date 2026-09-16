@@ -323,9 +323,7 @@ fn sync_to_tos(symbol: String, click_x: f64, click_y: f64) {
         .map(|e| e.location());
 
     // 1. Activate thinkorswim via osascript
-    let script = r#"tell application "System Events"
-    set frontmost of process "thinkorswim" to true
-end tell"#;
+    let script = r#"tell application "thinkorswim" to activate"#;
     eprintln!("[sync] activating thinkorswim...");
     let output = std::process::Command::new("osascript")
         .arg("-e")
@@ -340,6 +338,9 @@ end tell"#;
         }
         _ => {}
     }
+
+    // Wait for TOS to finish coming to the foreground before clicking
+    std::thread::sleep(std::time::Duration::from_millis(150));
 
     // 2. Click at the target position
     eprintln!("[sync] clicking...");
