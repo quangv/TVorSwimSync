@@ -19,6 +19,7 @@ const SAVE_DEBOUNCE_MS = 500;
 
 const emojiEl = document.getElementById("emoji")!;
 const symbolEl = document.getElementById("symbol")!;
+const mapModeEl = document.getElementById("map-mode")!;
 const permScreen = document.getElementById("perm-screen")!;
 const permA11y = document.getElementById("perm-a11y")!;
 
@@ -154,6 +155,9 @@ async function pollSymbols() {
     lastTvSymbol = state.tradingview_symbol;
 
     emojiEl.textContent = state.matched ? "🌊" : "🛑";
+
+    const mode = await invoke<{ mode: string }>("load_mappings");
+    mapModeEl.textContent = mode.mode === "long" ? "⬆️" : mode.mode === "short" ? "⬇️" : "";
 
     // Wave crashing over symbol when synced; centered on stop sign when unsynced
     if (state.matched) {
