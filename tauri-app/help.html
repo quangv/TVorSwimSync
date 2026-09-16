@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Sync Positioning Help</title>
+    <title>Help Notes</title>
     <style>
       * { margin: 0; padding: 0; box-sizing: border-box; }
       body {
@@ -26,6 +26,37 @@
         color: #aaa;
         margin-bottom: 12px;
       }
+      h2 {
+        font-size: 14px;
+        margin: 20px 0 8px;
+        color: #ccc;
+        text-align: left;
+      }
+      .click-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 12px;
+        text-align: left;
+        font-size: 13px;
+      }
+      .click-table td {
+        padding: 6px 10px;
+        border-bottom: 1px solid #2a2a2a;
+        vertical-align: top;
+      }
+      .click-table td:first-child {
+        white-space: nowrap;
+        color: #e0e0e0;
+        width: 1%;
+      }
+      .click-table td:last-child {
+        color: #aaa;
+      }
+      .section-divider {
+        border: none;
+        border-top: 1px solid #333;
+        margin: 16px 0;
+      }
       .disclaimer {
         font-size: 11px;
         color: #888;
@@ -36,10 +67,27 @@
     </style>
   </head>
   <body>
-    <h1>Sync Positioning Help</h1>
+    <h1>Help Notes</h1>
+    <h2>Sync Positioning</h2>
     <img src="/src/assets/help-positioning.png" alt="Position the widget above the thinkorswim symbol input" />
     <p>Position the floating widget <strong>directly above</strong> the thinkorswim symbol input field, as shown above.</p>
     <p>When Auto-Sync is enabled, the app will click just below the widget, type the TradingView symbol, and press Enter to sync.</p>
+
+    <hr class="section-divider" />
+
+    <h2>Triangle indicator (▲ / ▼)</h2>
+    <table class="click-table">
+      <tr>
+        <td>Single click</td>
+        <td>Toggle symbol mapping on — cycles between Long (▲ green) and Short (▼ red) mode.</td>
+      </tr>
+      <tr>
+        <td>Double click</td>
+        <td>Turn mapping off (⏺ yellow) immediately.</td>
+      </tr>
+    </table>
+    <p>Long mode maps symbols using your long mapping list; Short mode uses your short mapping list. Off disables all remapping.</p>
+
     <p class="disclaimer">⚠ Beta software – use at your own risk. This app sends simulated clicks and keystrokes. Verify all symbol changes before placing trades.</p>
   </body>
 </html>

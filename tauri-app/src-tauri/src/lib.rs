@@ -617,7 +617,7 @@ pub fn run() {
             let about_item = MenuItemBuilder::new("About TVorSwimSync")
                 .id("show_about")
                 .build(app)?;
-            let help_item = MenuItemBuilder::new("Sync Positioning Help")
+            let help_item = MenuItemBuilder::new("Help Notes")
                 .id("show_help")
                 .build(app)?;
             let release_notes_item = MenuItemBuilder::new("Release Notes")
@@ -644,10 +644,11 @@ pub fn run() {
 
             let help_submenu = SubmenuBuilder::new(app, "Help")
                 .item(&about_item)
-                .item(&help_item)
                 .item(&release_notes_item)
                 .separator()
                 .item(&reset_splash_item)
+                .separator()
+                .item(&help_item)
                 .build()?;
 
             let menu = MenuBuilder::new(app)
@@ -795,8 +796,8 @@ pub fn run() {
                             "help",
                             WebviewUrl::App("help.html".into()),
                         )
-                        .title("Sync Positioning Help")
-                        .inner_size(420.0, 480.0)
+                        .title("Help Notes")
+                        .inner_size(420.0, 560.0)
                         .resizable(false)
                         .build();
                     }
