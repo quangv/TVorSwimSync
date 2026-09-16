@@ -183,11 +183,24 @@ async function pollSymbols() {
   }
 }
 
+let mapModeClickTimer: ReturnType<typeof setTimeout> | null = null;
+
 mapModeEl.addEventListener("click", async () => {
-  const { mode, long_mappings, short_mappings } = await invoke<{ mode: string; long_mappings: string; short_mappings: string }>("load_mappings");
-  const next = mode === "off" ? "long" : mode === "long" ? "short" : "off";
-  await invoke("save_mappings", { mappings: { mode: next, long_mappings, short_mappings } });
-  await invoke("force_sync_cmd");
+  if (mapModeClickTimer) {
+    clearTimeout(mapModeClickTimer);
+    mapModeClickTimer = null;
+    const { long_mappings, short_mappings } = await invoke<{ mode: string; long_mappings: string; short_mappings: string }>("load_mappings");
+    await invoke("save_mappings", { mappings: { mode: "off", long_mappings, short_mappings } });
+    await invoke("force_sync_cmd");
+  } else {
+    mapModeClickTimer = setTimeout(async () => {
+      mapModeClickTimer = null;
+      const { mode, long_mappings, short_mappings } = await invoke<{ mode: string; long_mappings: string; short_mappings: string }>("load_mappings");
+      const next = mode === "short" ? "long" : "short";
+      await invoke("save_mappings", { mappings: { mode: next, long_mappings, short_mappings } });
+      await invoke("force_sync_cmd");
+    }, 250);
+  }
 });
 
 // Initialize
