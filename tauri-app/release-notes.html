@@ -93,10 +93,13 @@
                 <span class="badge">current</span>
             </div>
             <ul>
+                <li>ETF symbol mappings — Long and Short mapping sets (e.g. TSLA → TSLR)</li>
+                <li>Edit Mappings window with textarea editor and persistent storage</li>
                 <li>Mappings menu — Off / Long / Short quick-toggle with checkmark indicator</li>
                 <li>Force Sync menu item to immediately push current symbol to thinkorswim</li>
                 <li>Mode indicator on widget (▲ green / ▼ red / ⏺ yellow) — click to cycle modes</li>
                 <li>Auto-sync on mode switch — changing mode immediately triggers a sync</li>
+                <li>Fix: thinkorswim window focused before clicking (improves reliability)</li>
                 <li>Release Notes — this window, accessible from Help menu</li>
             </ul>
         </div>
@@ -106,12 +109,11 @@
         <div class="release">
             <div class="release-header">
                 <span class="version">v0.1.4</span>
-                <span class="date">Sep 2026</span>
+                <span class="date">May 2026</span>
             </div>
             <ul>
-                <li>ETF symbol mappings — Long and Short mapping sets (e.g. TSLA → TSLR)</li>
-                <li>Edit Mappings window with textarea editor and persistent storage</li>
-                <li>Pre-filled default mappings for common leveraged ETF pairs</li>
+                <li>Fix: arm triggers only a single sync on click</li>
+                <li>Fix: first sync fires immediately on arm</li>
             </ul>
         </div>
 
@@ -120,13 +122,11 @@
         <div class="release">
             <div class="release-header">
                 <span class="version">v0.1.3</span>
-                <span class="date">May 2026</span>
+                <span class="date">Apr–May 2026</span>
             </div>
             <ul>
                 <li>Arm / Disarm — single action shows window and enables auto-sync together</li>
                 <li>Show / Hide window toggle independent of sync state</li>
-                <li>Fix: first sync now fires immediately on arm</li>
-                <li>Fix: window focus restored before clicking thinkorswim</li>
             </ul>
         </div>
 
@@ -139,8 +139,6 @@
             </div>
             <ul>
                 <li>Splash screen on first launch with "Don't show again" option</li>
-                <li>About page with dynamic version number</li>
-                <li>Show / Hide window menu toggle</li>
             </ul>
         </div>
 
@@ -152,11 +150,7 @@
                 <span class="date">Apr 2026</span>
             </div>
             <ul>
-                <li>Screen recording and accessibility permission checks with tap-to-fix banners</li>
-                <li>Cursor restored to original position after sync</li>
-                <li>Support for 2–5 character symbols including futures (ES!, NQ!)</li>
-                <li>Faster sync — reduced activation delay</li>
-                <li>Sync Positioning Help window with visual guide</li>
+                <li>About page with dynamic version number</li>
             </ul>
         </div>
 
@@ -172,7 +166,12 @@
                 <li>Auto-sync on symbol change with 🌊 / 🛑 match indicator</li>
                 <li>Setup calibration — click thinkorswim input field to save target</li>
                 <li>Test Target and Test Sync → NVDA menu items</li>
+                <li>Screen recording and accessibility permission checks with tap-to-fix banners</li>
+                <li>Support for 2–5 character symbols including futures (ES!, NQ!)</li>
+                <li>Cursor restored to original position after sync</li>
+                <li>Sync Positioning Help window with visual guide</li>
                 <li>Window position persistence</li>
+                <li>About page</li>
             </ul>
         </div>
     </div>
