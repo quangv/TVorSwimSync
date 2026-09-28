@@ -29,8 +29,8 @@ let lastTvSymbol: string | null = null;
 let lastSyncEnabled = false;
 let syncing = false;
 let suppressEmojiUntil = 0;
-let mapModeAwaitingReveal = false;
 let lastMapMode: string | null = null;
+let onModeChange: (() => void) | null = null;
 
 async function checkPermissions() {
   try {
@@ -188,13 +188,9 @@ async function pollSymbols() {
       mapModeEl.style.color = "#FECB09";
     }
 
-    if (mapModeAwaitingReveal && mode !== lastMapMode) {
-      mapModeAwaitingReveal = false;
-      requestAnimationFrame(() => requestAnimationFrame(() => {
-        mapModeEl.style.transition = "transform 50ms ease-in, opacity 100ms ease-in";
-        mapModeEl.style.transform = "";
-        mapModeEl.style.opacity = "";
-      }));
+    if (mode !== lastMapMode) {
+      onModeChange?.();
+      onModeChange = null;
     }
     lastMapMode = mode;
 
@@ -214,32 +210,65 @@ function flashEmoji() {
   setTimeout(() => { emojiEl.style.opacity = ""; }, 1500);
 }
 
-let pressAnimTimer: ReturnType<typeof setTimeout> | null = null;
+function animateEl(el: HTMLElement, keyframes: Keyframe[], options: KeyframeAnimationOptions & { signal: AbortSignal }): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (options.signal.aborted) return reject(new DOMException("Aborted", "AbortError"));
+    const anim = el.animate(keyframes, options);
+    options.signal.addEventListener("abort", () => { anim.cancel(); reject(new DOMException("Aborted", "AbortError")); });
+    anim.finished.then(() => resolve()).catch(reject);
+  });
+}
+
+function waitForModeChange(signal: AbortSignal, minMs: number): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal.aborted) return reject(new DOMException("Aborted", "AbortError"));
+    const deadline = Date.now() + minMs;
+    signal.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")));
+    onModeChange = () => {
+      const remaining = deadline - Date.now();
+      if (remaining > 0) setTimeout(resolve, remaining); else resolve();
+    };
+    // max wait fallback
+    setTimeout(resolve, 3000);
+  });
+}
+
+let hideController: AbortController | null = null;
+let pressAnim: Animation | null = null;
 
 mapModeEl.addEventListener("mousedown", () => {
-  if (pressAnimTimer) { clearTimeout(pressAnimTimer); pressAnimTimer = null; }
-  mapModeEl.style.transition = "transform 100ms, opacity 0ms";
-  mapModeEl.style.opacity = "1";
-  mapModeEl.style.transform = "scale(0.75)";
-});
-mapModeEl.addEventListener("mouseup", () => {
-  // blast up out of frame
-  mapModeEl.style.transition = "transform 200ms ease-in, opacity 150ms ease-in";
-  mapModeEl.style.transform = "scale(4)";
-  mapModeEl.style.opacity = "0";
-  // snap back small+invisible, wait for pollSymbols to reveal
-  pressAnimTimer = setTimeout(() => {
-    pressAnimTimer = null;
-    mapModeEl.style.transition = "transform 0ms, opacity 0ms";
-    mapModeEl.style.transform = "scale(0.3)";
-    mapModeEl.style.opacity = "0";
-    mapModeAwaitingReveal = true;
-  }, 200);
-});
-mapModeEl.addEventListener("mouseleave", () => {
-  if (mapModeAwaitingReveal) return;
+  hideController?.abort();
+  hideController = null;
+  pressAnim?.cancel();
   mapModeEl.style.transform = "";
   mapModeEl.style.opacity = "";
+  pressAnim = mapModeEl.animate(
+    [{ transform: "scale(1)" }, { transform: "scale(0.75)" }],
+    { duration: 100, fill: "forwards" }
+  );
+});
+
+mapModeEl.addEventListener("mouseup", async () => {
+  pressAnim?.cancel();
+  pressAnim = null;
+  hideController?.abort();
+  const ctrl = new AbortController();
+  hideController = ctrl;
+  try {
+    // explosion
+    await animateEl(mapModeEl, [{ transform: "scale(0.75)", opacity: 1 }, { transform: "scale(4)", opacity: 0 }], { duration: 150, easing: "ease-in", fill: "forwards", signal: ctrl.signal });
+    // snap hidden, wait for mode change
+    mapModeEl.style.transform = "scale(0.3)";
+    mapModeEl.style.opacity = "0";
+    mapModeEl.getAnimations().forEach(a => a.cancel());
+    await waitForModeChange(ctrl.signal, 800);
+    // reveal
+    await animateEl(mapModeEl, [{ transform: "scale(0.3)", opacity: 0 }, { transform: "scale(1)", opacity: 1 }], { duration: 300, easing: "ease-out", fill: "forwards", signal: ctrl.signal });
+    mapModeEl.style.transform = "";
+    mapModeEl.style.opacity = "";
+  } catch {
+    // aborted by next mousedown — leave cleanup to it
+  }
 });
 
 let mapModeClickTimer: ReturnType<typeof setTimeout> | null = null;
