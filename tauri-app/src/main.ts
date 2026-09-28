@@ -173,6 +173,7 @@ async function pollSymbols() {
       const mappedSymbol = await invoke<string>("apply_symbol_mapping", { symbol: state.tradingview_symbol });
       matched = mappedSymbol.toUpperCase() === state.thinkorswim_symbol.toUpperCase();
     }
+    if (Date.now() < suppressEmojiUntil) return;
     emojiEl.textContent = matched ? "🌊" : "🛑";
     if (mode === "long") {
       mapModeEl.textContent = "▲";
@@ -203,11 +204,18 @@ function flashEmoji() {
 
 mapModeEl.addEventListener("mousedown", () => {
   mapModeEl.style.transform = "scale(0.75)";
-  mapModeEl.style.opacity = "0.4";
 });
 mapModeEl.addEventListener("mouseup", () => {
   mapModeEl.style.transform = "";
-  mapModeEl.style.opacity = "";
+  // after scale animation completes, snap dim then fade back in
+  setTimeout(() => {
+    mapModeEl.style.transition = "transform 100ms, opacity 0ms";
+    mapModeEl.style.opacity = "0.15";
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      mapModeEl.style.transition = "";
+      mapModeEl.style.opacity = "";
+    }));
+  }, 100);
 });
 mapModeEl.addEventListener("mouseleave", () => {
   mapModeEl.style.transform = "";
@@ -218,6 +226,7 @@ let mapModeClickTimer: ReturnType<typeof setTimeout> | null = null;
 
 mapModeEl.addEventListener("click", async () => {
   flashEmoji();
+  suppressEmojiUntil = Date.now() + 1500;
   if (mapModeClickTimer) {
     clearTimeout(mapModeClickTimer);
     mapModeClickTimer = null;
