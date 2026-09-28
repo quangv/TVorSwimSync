@@ -3,7 +3,7 @@
 #map-mode {
   cursor: default !important;
   transition-property: transform, opacity;
-  transition-duration: 100ms, 5000ms;
+  transition-duration: 100ms, 100ms;
 }
 
 html, body {

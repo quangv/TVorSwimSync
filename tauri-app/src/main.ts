@@ -199,7 +199,7 @@ async function pollSymbols() {
 
 function flashEmoji() {
   emojiEl.style.opacity = "0.15";
-  setTimeout(() => { emojiEl.style.opacity = ""; }, 350);
+  setTimeout(() => { emojiEl.style.opacity = ""; }, 1500);
 }
 
 mapModeEl.addEventListener("mousedown", () => {
@@ -207,12 +207,14 @@ mapModeEl.addEventListener("mousedown", () => {
 });
 mapModeEl.addEventListener("mouseup", () => {
   mapModeEl.style.transform = "";
-  // after scale animation completes, snap dim then fade back in
+  // after press animation, snap to small+dim then scale+fade back in
   setTimeout(() => {
-    mapModeEl.style.transition = "transform 100ms, opacity 0ms";
+    mapModeEl.style.transition = "transform 0ms, opacity 0ms";
+    mapModeEl.style.transform = "scale(0.5)";
     mapModeEl.style.opacity = "0.15";
     requestAnimationFrame(() => requestAnimationFrame(() => {
-      mapModeEl.style.transition = "";
+      mapModeEl.style.transition = "transform 600ms ease-in, opacity 3000ms ease-in";
+      mapModeEl.style.transform = "";
       mapModeEl.style.opacity = "";
     }));
   }, 100);
