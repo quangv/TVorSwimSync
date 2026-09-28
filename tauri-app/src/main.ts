@@ -117,6 +117,12 @@ getCurrentWindow().onMoved(() => {
   debounceSavePosition();
 });
 
+// JS-based dragging so CSS cursor isn't overridden by native drag region
+document.getElementById("app")!.addEventListener("mousedown", (e) => {
+  if ((e.target as HTMLElement).closest("#map-mode")) return;
+  getCurrentWindow().startDragging();
+});
+
 async function pollSymbols() {
   try {
     const state = await invoke<SymbolState>("poll_symbols");
@@ -183,9 +189,25 @@ async function pollSymbols() {
   }
 }
 
+function flashEmoji() {
+  emojiEl.style.opacity = "0.15";
+  setTimeout(() => { emojiEl.style.opacity = ""; }, 350);
+}
+
+mapModeEl.addEventListener("mousedown", () => {
+  mapModeEl.style.transform = "scale(0.75)";
+});
+mapModeEl.addEventListener("mouseup", () => {
+  mapModeEl.style.transform = "";
+});
+mapModeEl.addEventListener("mouseleave", () => {
+  mapModeEl.style.transform = "";
+});
+
 let mapModeClickTimer: ReturnType<typeof setTimeout> | null = null;
 
 mapModeEl.addEventListener("click", async () => {
+  flashEmoji();
   if (mapModeClickTimer) {
     clearTimeout(mapModeClickTimer);
     mapModeClickTimer = null;
@@ -199,7 +221,7 @@ mapModeEl.addEventListener("click", async () => {
       const next = mode === "short" ? "long" : "short";
       await invoke("save_mappings", { mappings: { mode: next, long_mappings, short_mappings } });
       await invoke("force_sync_cmd");
-    }, 250);
+    }, 400);
   }
 });
 

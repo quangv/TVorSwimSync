@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+#map-mode {
+  cursor: pointer !important;
+}
+
 html, body {
   margin: 0;
   padding: 0;
