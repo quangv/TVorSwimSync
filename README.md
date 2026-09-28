@@ -52,10 +52,9 @@ Run `npm run tauri:dev` to launch the app in dev mode with hot reload.
 2. Run `git log v<prev>..HEAD --oneline` to see what changed, then add a new entry at the top of `tauri-app/release-notes.html` with those changes as bullet points (copy the previous block, update version/date/bullets, move `current` CSS class and badge to the new block)
 3. Build: `cd tauri-app && npm run tauri:build`
 4. The DMG is output to `tauri-app/src-tauri/target/release/bundle/dmg/`
-5. Commit: `git commit -am "v<version> — <one-line summary>"`
+5. Commit: `git commit -am "v<version> release"`
 6. Tag: `git tag v<version>`
 7. Push: `git push && git push --tags`
-8. Create GitHub release: `gh release create v<version> --title "v<version> — <summary>" --notes "<release notes>" tauri-app/src-tauri/target/release/bundle/dmg/TVorSwimSync_<version>_aarch64.dmg`
 
 ## Requirements
 
