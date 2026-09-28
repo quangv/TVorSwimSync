@@ -120,15 +120,30 @@ getCurrentWindow().onMoved(() => {
   debounceSavePosition();
 });
 
+// JS dragging — only start after mouse moves 4px to avoid jump on plain clicks
 document.getElementById("app")!.addEventListener("mousedown", (e) => {
   if ((e.target as HTMLElement).closest("#map-mode")) return;
-  document.body.style.cursor = "grabbing";
-  getCurrentWindow().startDragging();
+  const startX = e.clientX, startY = e.clientY;
+  let dragging = false;
+  const onMove = (me: MouseEvent) => {
+    if (dragging) return;
+    if (Math.abs(me.clientX - startX) > 4 || Math.abs(me.clientY - startY) > 4) {
+      dragging = true;
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+      document.body.style.cursor = "grabbing";
+      getCurrentWindow().startDragging();
+    }
+  };
+  const onUp = () => {
+    document.removeEventListener("mousemove", onMove);
+    document.removeEventListener("mouseup", onUp);
+    document.body.style.cursor = "";
+  };
+  document.addEventListener("mousemove", onMove);
+  document.addEventListener("mouseup", onUp);
 });
 
-document.addEventListener("mouseup", () => {
-  document.body.style.cursor = "";
-});
 
 
 async function pollSymbols() {
