@@ -28,6 +28,7 @@ let hasA11yPermission = true;
 let lastTvSymbol: string | null = null;
 let lastSyncEnabled = false;
 let syncing = false;
+let suppressEmojiUntil = 0;
 
 async function checkPermissions() {
   try {
