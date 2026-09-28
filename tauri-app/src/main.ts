@@ -128,7 +128,8 @@ async function pollSymbols() {
     const state = await invoke<SymbolState>("poll_symbols");
 
     if (state.tradingview_symbol) {
-      symbolEl.textContent = state.tradingview_symbol;
+      const mappedForDisplay = await invoke<string>("apply_symbol_mapping", { symbol: state.tradingview_symbol });
+      symbolEl.textContent = mappedForDisplay;
     } else {
       symbolEl.textContent = "--";
     }
