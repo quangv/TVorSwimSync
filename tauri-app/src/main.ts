@@ -117,11 +117,16 @@ getCurrentWindow().onMoved(() => {
   debounceSavePosition();
 });
 
-// JS-based dragging so CSS cursor isn't overridden by native drag region
 document.getElementById("app")!.addEventListener("mousedown", (e) => {
   if ((e.target as HTMLElement).closest("#map-mode")) return;
+  document.body.style.cursor = "grabbing";
   getCurrentWindow().startDragging();
 });
+
+document.addEventListener("mouseup", () => {
+  document.body.style.cursor = "";
+});
+
 
 async function pollSymbols() {
   try {
@@ -197,12 +202,15 @@ function flashEmoji() {
 
 mapModeEl.addEventListener("mousedown", () => {
   mapModeEl.style.transform = "scale(0.75)";
+  mapModeEl.style.opacity = "0.4";
 });
 mapModeEl.addEventListener("mouseup", () => {
   mapModeEl.style.transform = "";
+  mapModeEl.style.opacity = "";
 });
 mapModeEl.addEventListener("mouseleave", () => {
   mapModeEl.style.transform = "";
+  mapModeEl.style.opacity = "";
 });
 
 let mapModeClickTimer: ReturnType<typeof setTimeout> | null = null;
@@ -219,10 +227,10 @@ mapModeEl.addEventListener("click", async () => {
     mapModeClickTimer = setTimeout(async () => {
       mapModeClickTimer = null;
       const { mode, long_mappings, short_mappings } = await invoke<{ mode: string; long_mappings: string; short_mappings: string }>("load_mappings");
-      const next = mode === "short" ? "long" : "short";
+      const next = mode === "long" ? "short" : mode === "short" ? "long" : "long";
       await invoke("save_mappings", { mappings: { mode: next, long_mappings, short_mappings } });
       await invoke("force_sync_cmd");
-    }, 400);
+    }, 300);
   }
 });
 
