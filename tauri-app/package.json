@@ -1,7 +1,7 @@
 {
   "name": "tauri-app",
   "private": true,
-  "version": "0.1.9",
+  "version": "0.1.10",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -10,7 +10,9 @@
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
-    "app:prod": "open -a Terminal src-tauri/target/release/bundle/macos/TVorSwimSync.app/Contents/MacOS/tauri-app"
+    "app:prod": "open -a Terminal src-tauri/target/release/bundle/macos/TVorSwimSync.app/Contents/MacOS/tauri-app",
+    "release": "cd .. && bash scripts/release.sh",
+    "build-release": "cd .. && bash scripts/build-release.sh"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.10.1",

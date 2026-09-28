@@ -88,9 +88,26 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="version current" id="current-version">v0.1.9</span>
+                <span class="version current" id="current-version">v0.1.10</span>
                 <span class="date">Sep 2026</span>
                 <span class="badge">current</span>
+            </div>
+            <ul>
+                <li>Indicator button: polished press + explosion animation using Web Animations API — no more flicker or race conditions on rapid clicks</li>
+                <li>Indicator stays hidden after click until mode change is confirmed by polling — eliminates old symbol flash</li>
+                <li>Symbol display now shows the mapped symbol instead of the raw TradingView ticker</li>
+                <li>First click on the widget now registers immediately (acceptFirstMouse)</li>
+                <li>Window drag: only starts after 4px of movement — eliminates accidental window jump on plain clicks</li>
+                <li>Drag cursor changes to grabbing during active drag</li>
+            </ul>
+        </div>
+
+        <hr class="divider"/>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="version">v0.1.9</span>
+                <span class="date">Sep 2026</span>
             </div>
             <ul>
                 <li>Widget indicator button: press animation, explosion effect, and smooth fade-in on mode change</li>

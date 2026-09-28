@@ -1,33 +1,16 @@
 # CLAUDE.md — TVorSwimSync
 
-## Release Checklist
+## Release Process
 
-When releasing a new version, bump the version in **all four places** — they must match:
+When the user says "do a release" or "release <version>":
 
-1. `tauri-app/package.json` → `"version"`
-2. `tauri-app/src-tauri/tauri.conf.json` → `"version"`
-3. `tauri-app/src-tauri/Cargo.toml` → `version`
-4. `tauri-app/release-notes.html`:
-   - Add new `<div class="release">` block at the top
-   - Set `id="current-version"` and `class="version current"` on the new version span
-   - Add `<span class="badge">current</span>`
-   - Remove `current` class and badge from the previous version block
-   - Write bullet points summarising changes (run `git log v<prev>..HEAD --oneline` for reference)
+1. Check the current version: `grep '"version"' tauri-app/src-tauri/tauri.conf.json`
+2. Determine next version (increment patch, e.g. 0.1.9 → 0.1.10)
+3. Run `npm run release <version>` from `tauri-app/` — bumps all 4 files atomically
+4. Write release notes: run `git log v<prev>..HEAD --oneline` to see what changed, then add a new block at the top of `tauri-app/release-notes.html` (copy previous block structure, update version/date/bullets, keep `class="version current"` and `id="current-version"` on new span, remove `current` class and badge from old block)
+5. Run `npm run build-release <version>` from `tauri-app/` — builds, commits, tags, pushes, creates GitHub release
 
-Then build and publish:
-
-```bash
-cd tauri-app
-npm run tauri:build
-# DMG output: tauri-app/src-tauri/target/release/bundle/dmg/
-git commit -am "v<version> release"
-git tag v<version>
-git push && git push --tags
-gh release create v<version> \
-  --title "v<version> — <one-line summary>" \
-  --notes "<release notes>" \
-  tauri-app/src-tauri/target/release/bundle/dmg/TVorSwimSync_<version>_aarch64.dmg
-```
+Scripts live in `scripts/release.sh` and `scripts/build-release.sh`.
 
 ## Project Structure
 
