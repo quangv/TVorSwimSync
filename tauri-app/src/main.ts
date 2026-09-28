@@ -29,6 +29,8 @@ let lastTvSymbol: string | null = null;
 let lastSyncEnabled = false;
 let syncing = false;
 let suppressEmojiUntil = 0;
+let mapModeAwaitingReveal = false;
+let lastMapMode: string | null = null;
 
 async function checkPermissions() {
   try {
@@ -186,6 +188,16 @@ async function pollSymbols() {
       mapModeEl.style.color = "#FECB09";
     }
 
+    if (mapModeAwaitingReveal && mode !== lastMapMode) {
+      mapModeAwaitingReveal = false;
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        mapModeEl.style.transition = "transform 50ms ease-in, opacity 100ms ease-in";
+        mapModeEl.style.transform = "";
+        mapModeEl.style.opacity = "";
+      }));
+    }
+    lastMapMode = mode;
+
     // Wave crashing over symbol when synced; centered on stop sign when unsynced
     if (matched) {
       symbolEl.style.transform = "translateY(22px)";
@@ -202,24 +214,30 @@ function flashEmoji() {
   setTimeout(() => { emojiEl.style.opacity = ""; }, 1500);
 }
 
+let pressAnimTimer: ReturnType<typeof setTimeout> | null = null;
+
 mapModeEl.addEventListener("mousedown", () => {
+  if (pressAnimTimer) { clearTimeout(pressAnimTimer); pressAnimTimer = null; }
+  mapModeEl.style.transition = "transform 100ms, opacity 0ms";
+  mapModeEl.style.opacity = "1";
   mapModeEl.style.transform = "scale(0.75)";
 });
 mapModeEl.addEventListener("mouseup", () => {
-  mapModeEl.style.transform = "";
-  // after press animation, snap to small+dim then scale+fade back in
-  setTimeout(() => {
+  // blast up out of frame
+  mapModeEl.style.transition = "transform 200ms ease-in, opacity 150ms ease-in";
+  mapModeEl.style.transform = "scale(4)";
+  mapModeEl.style.opacity = "0";
+  // snap back small+invisible, wait for pollSymbols to reveal
+  pressAnimTimer = setTimeout(() => {
+    pressAnimTimer = null;
     mapModeEl.style.transition = "transform 0ms, opacity 0ms";
-    mapModeEl.style.transform = "scale(0.5)";
-    mapModeEl.style.opacity = "0.15";
-    requestAnimationFrame(() => requestAnimationFrame(() => {
-      mapModeEl.style.transition = "transform 600ms ease-in, opacity 3000ms ease-in";
-      mapModeEl.style.transform = "";
-      mapModeEl.style.opacity = "";
-    }));
-  }, 100);
+    mapModeEl.style.transform = "scale(0.3)";
+    mapModeEl.style.opacity = "0";
+    mapModeAwaitingReveal = true;
+  }, 200);
 });
 mapModeEl.addEventListener("mouseleave", () => {
+  if (mapModeAwaitingReveal) return;
   mapModeEl.style.transform = "";
   mapModeEl.style.opacity = "";
 });
